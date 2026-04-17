@@ -16,20 +16,20 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 Once you install kstack you'll have access to a set of K8s commands inside Claude Code:
 
 **Monitoring**
-* `/cluster-status` — Cluster-wide health snapshot: restarts, resource pressure, failing pods, node conditions
-* `/events` — Recent cluster events, filtered and ranked by severity
-* `/watch <resource>` — Background watcher that pings Claude only on state changes (restarts, phase transitions, warning events) — idle tokens stay near zero
+* `/cluster-status` — Health snapshot (pod restarts, node conditions, resource pressure)
+* `/events` — Recent events, ranked by severity
+* `/watch <resource>` — Background watcher (pings only on state changes)
 
 **Troubleshooting**
-* `/investigate <resource>` — Root-cause analysis: events, logs, related resources, and recent changes. For pods, explains Pending/CrashLoopBackOff/OOMKilled/ImagePullBackOff states
-* `/exec <pod>` — Guided shell into a pod with common diagnostics pre-loaded (DNS, service connectivity, env dump); falls back to an ephemeral debug container for scratch/distroless images
-* `/logs` — Fetch container logs with node-side grep via kubetail (no full-log transfer)
+* `/investigate <resource>` — Root-cause analysis across events, logs, and related resources
+* `/exec <pod>` — Guided shell with diagnostics preloaded; ephemeral debug container for scratch/distroless
+* `/logs` — Fetch container logs with remote grep via kubetail
 
 **Audits**
-* `/audit-security` — RBAC audit, pod security posture, and privilege tightening suggestions
-* `/audit-network` — NetworkPolicy, Service, Ingress, and DNS sanity checks
-* `/audit-cost` — Requests vs. usage, over-provisioned workloads, idle capacity
-* `/audit-upgrade` — Deprecated APIs and version skew before a cluster upgrade
+* `/audit-security` — RBAC, pod security posture, privilege tightening
+* `/audit-network` — NetworkPolicy, Service, Ingress, GatewayAPI, DNS and encryption checks
+* `/audit-cost` — Requests vs. usage, over-provisioning, idle capacity
+* `/audit-outdated` — Outdated services, known CVEs, available version bumps
 
 Our goal is to help bring the power of AI to K8s monitoring in a user-friendly and cost-effective way that keeps you in control. If you notice a bug or have a suggestion please create a GitHub Issue or send us an email (hello@kubetail.com)!
 
