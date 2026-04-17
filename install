@@ -42,19 +42,16 @@ KSTACK_CONFIG_DIR="$HOME/.config/kstack"
 KSTACK_GLOBAL_BIN="$KSTACK_CONFIG_DIR/bin"
 KSTACK_GLOBAL_LIB="$KSTACK_CONFIG_DIR/lib"
 KSTACK_SRC="$KSTACK_CONFIG_DIR/src"
-# Canonical upstream. Override via KSTACK_REMOTE_URL env var (useful for CI
-# and testing against a local clone); leave unset for normal user installs.
+# Override KSTACK_REMOTE_URL for CI and local-clone testing. Leave unset for
+# normal user installs.
 KSTACK_REMOTE_URL="${KSTACK_REMOTE_URL:-https://github.com/kubetail-org/kstack.git}"
 
 QUIET=0
 log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
 
-# ─── Maintained checkout (global mode only) ───────────────────
 # Clones (first time) or fetches+checks-out (subsequent runs) the canonical
-# upstream at the latest tagged release. Fresh-install tag resolution uses
-# `git ls-remote` so no local clone is needed to begin with; upgrade uses the
-# local clone's refs. Pre-release fallback: if no `v*` tags exist anywhere,
-# use `main` with a visible warning.
+# upstream at the latest tagged release. Pre-release fallback: if no `v*` tags
+# exist anywhere, use `main` with a visible warning.
 ensure_src_checkout() {
   mkdir -p "$KSTACK_CONFIG_DIR"
 
@@ -90,87 +87,77 @@ ensure_src_checkout() {
   fi
 }
 
-# render_skill — expand template with partials and scalars.
-# Args: $1 skill $2 agent $3 install_root $4 bin_dir $5 out_file
-# Reads globals: SKILLS_SRC, GLOBAL_FLAGS_PARTIAL, UPDATE_CHECK_PARTIAL
+# render_skill $skill $agent $install_root $bin_dir $out_file $skills_src $global_flags_partial $update_check_partial
 render_skill() {
   local skill="$1" agent="$2" install_root="$3" bin_dir="$4" out_file="$5"
-  local src="$SKILLS_SRC/$skill/SKILL.md.tmpl"
+  local skills_src="$6" gf="$7" uc="$8"
   mkdir -p "$(dirname "$out_file")"
-  awk -v gf="$GLOBAL_FLAGS_PARTIAL" -v uc="$UPDATE_CHECK_PARTIAL" '
-    /\{\{GLOBAL_FLAGS\}\}/ {
-      while ((getline line < gf) > 0) print line
-      close(gf); next
+  awk -v gf="$gf" -v uc="$uc" \
+      -v install_root="$install_root" -v bin_dir="$bin_dir" \
+      -v skill="$skill" -v agent="$agent" '
+    function inline(path,    line) {
+      while ((getline line < path) > 0) {
+        gsub(/\{\{INSTALL_ROOT\}\}/, install_root, line)
+        gsub(/\{\{BIN_DIR\}\}/,      bin_dir,      line)
+        gsub(/\{\{SKILL_NAME\}\}/,   skill,        line)
+        gsub(/\{\{AGENT\}\}/,        agent,        line)
+        print line
+      }
+      close(path)
     }
-    /\{\{UPDATE_CHECK\}\}/ {
-      while ((getline line < uc) > 0) print line
-      close(uc); next
+    /\{\{GLOBAL_FLAGS\}\}/ { inline(gf); next }
+    /\{\{UPDATE_CHECK\}\}/ { inline(uc); next }
+    {
+      gsub(/\{\{INSTALL_ROOT\}\}/, install_root)
+      gsub(/\{\{BIN_DIR\}\}/,      bin_dir)
+      gsub(/\{\{SKILL_NAME\}\}/,   skill)
+      gsub(/\{\{AGENT\}\}/,        agent)
+      print
     }
-    { print }
-  ' "$src" | sed \
-    -e "s|{{INSTALL_ROOT}}|$install_root|g" \
-    -e "s|{{BIN_DIR}}|$bin_dir|g" \
-    -e "s|{{SKILL_NAME}}|$skill|g" \
-    -e "s|{{AGENT}}|$agent|g" \
-    > "$out_file"
+  ' "$skills_src/$skill/SKILL.md.tmpl" > "$out_file"
 }
 
-install_agent_local() {
-  local agent="$1"
-  local skills_dir
-  skills_dir="$(agent_skills_dir_local "$SCRIPT_DIR" "$agent")"
+# install_agent $mode $agent $install_root $bin_dir $skills_dir $slot_prefix
+#   $mode is "local" or "global" — used for log text only.
+#   $slot_prefix is "" for local, "kstack-" for global.
+install_agent() {
+  local mode="$1" agent="$2" install_root="$3" bin_dir="$4" skills_dir="$5" slot_prefix="$6"
   mkdir -p "$skills_dir"
 
-  local installed=""
+  local installed="" skill out_dir out_file
   for skill in $SKILL_NAMES; do
-    local out_dir="$skills_dir/$skill"
-    local out_file="$out_dir/SKILL.md"
-    # If a stale symlink occupies the slot from an older setup, replace it.
-    if [ -L "$out_dir" ]; then rm -f "$out_dir"; fi
-    if [ -L "$out_file" ]; then rm -f "$out_file"; fi
+    out_dir="$skills_dir/${slot_prefix}${skill}"
+    out_file="$out_dir/SKILL.md"
+    # Replace stale symlinks from earlier layouts.
+    [ -L "$out_dir" ] && rm -f "$out_dir"
+    [ -L "$out_file" ] && rm -f "$out_file"
     mkdir -p "$out_dir"
-    render_skill "$skill" "$agent" "$SCRIPT_DIR" "$BIN_DIR" "$out_file"
-    installed="$installed $skill"
+    render_skill "$skill" "$agent" "$install_root" "$bin_dir" "$out_file" \
+      "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"
+    installed="$installed ${slot_prefix}${skill}"
   done
 
-  log "  $agent (local) → $skills_dir"
-  log "    installed:$installed"
-}
-
-install_agent_global() {
-  local agent="$1"
-  local skills_dir
-  skills_dir="$(agent_skills_dir_global "$agent")"
-  mkdir -p "$skills_dir"
-
-  local installed=""
-  for skill in $SKILL_NAMES; do
-    local out_dir="$skills_dir/kstack-$skill"
-    local out_file="$out_dir/SKILL.md"
-    if [ -L "$out_dir" ]; then rm -f "$out_dir"; fi
-    if [ -L "$out_file" ]; then rm -f "$out_file"; fi
-    mkdir -p "$out_dir"
-    render_skill "$skill" "$agent" "$KSTACK_CONFIG_DIR" "$KSTACK_GLOBAL_BIN" "$out_file"
-    installed="$installed kstack-$skill"
-  done
-
-  log "  $agent (global) → $skills_dir"
+  log "  $agent ($mode) → $skills_dir"
   log "    installed:$installed"
 }
 
 copy_bin_global() {
   mkdir -p "$KSTACK_GLOBAL_BIN"
+  local f name
   for f in "$BIN_DIR"/*; do
     [ -e "$f" ] || continue
-    case "$(basename "$f")" in .gitkeep) continue ;; esac
+    name="${f##*/}"
+    # .gitkeep exists only to let git track an otherwise-empty bin/ in fresh checkouts.
+    [ "$name" = ".gitkeep" ] && continue
     cp "$f" "$KSTACK_GLOBAL_BIN/"
-    chmod +x "$KSTACK_GLOBAL_BIN/$(basename "$f")"
+    chmod +x "$KSTACK_GLOBAL_BIN/$name"
   done
   log "  bin/ → $KSTACK_GLOBAL_BIN"
 }
 
 copy_lib_global() {
   mkdir -p "$KSTACK_GLOBAL_LIB"
+  local f
   for f in "$SRC_ROOT/lib"/*.sh; do
     [ -e "$f" ] || continue
     cp "$f" "$KSTACK_GLOBAL_LIB/"
@@ -196,12 +183,10 @@ main() {
     esac
   done
 
-  # ─── Determine target agents ───────────────────────────────────
   TARGET_AGENTS=""
-  if [ -z "$AGENT" ] || [ "$AGENT" = "auto" ]; then
+  if [ -z "$AGENT" ]; then
     for h in $KNOWN_AGENTS; do
-      cli="$(agent_cli "$h")"
-      if command -v "$cli" >/dev/null 2>&1; then
+      if command -v "$(agent_cli "$h")" >/dev/null 2>&1; then
         TARGET_AGENTS="$TARGET_AGENTS $h"
       fi
     done
@@ -217,10 +202,8 @@ main() {
     fi
     TARGET_AGENTS="$AGENT"
   fi
+  TARGET_AGENTS="${TARGET_AGENTS# }"
 
-  TARGET_AGENTS="$(echo "$TARGET_AGENTS" | awk '{$1=$1; print}')"
-
-  # ─── Resolve render source ────────────────────────────────────
   if [ "$GLOBAL" -eq 1 ]; then
     ensure_src_checkout
     SRC_ROOT="$KSTACK_SRC"
@@ -231,7 +214,6 @@ main() {
   SKILLS_SRC="$SRC_ROOT/skills"
   BIN_DIR="$SRC_ROOT/bin"
 
-  # ─── Discover skills ──────────────────────────────────────────
   if [ ! -d "$SKILLS_SRC" ]; then
     echo "No skills/ directory at $SKILLS_SRC" >&2
     exit 1
@@ -240,9 +222,10 @@ main() {
   SKILL_NAMES=""
   for d in "$SKILLS_SRC"/*/; do
     [ -f "${d}SKILL.md.tmpl" ] || continue
-    SKILL_NAMES="$SKILL_NAMES $(basename "$d")"
+    d="${d%/}"
+    SKILL_NAMES="$SKILL_NAMES ${d##*/}"
   done
-  SKILL_NAMES="$(echo "$SKILL_NAMES" | awk '{$1=$1; print}')"
+  SKILL_NAMES="${SKILL_NAMES# }"
 
   if [ -z "$SKILL_NAMES" ]; then
     echo "No SKILL.md.tmpl files found under $SKILLS_SRC" >&2
@@ -258,20 +241,21 @@ main() {
     fi
   done
 
-  # ─── Go ────────────────────────────────────────────────────────
   if [ "$GLOBAL" -eq 1 ]; then
     log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
     mkdir -p "$KSTACK_CONFIG_DIR/cache"
     copy_bin_global
     copy_lib_global
     for h in $TARGET_AGENTS; do
-      install_agent_global "$h"
+      install_agent global "$h" "$KSTACK_CONFIG_DIR" "$KSTACK_GLOBAL_BIN" \
+        "$(agent_skills_dir_global "$h")" "kstack-"
     done
   else
     log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
     mkdir -p "$SCRIPT_DIR/.cache/kstack"
     for h in $TARGET_AGENTS; do
-      install_agent_local "$h"
+      install_agent local "$h" "$SCRIPT_DIR" "$BIN_DIR" \
+        "$(agent_skills_dir_local "$SCRIPT_DIR" "$h")" ""
     done
   fi
 

@@ -19,6 +19,7 @@ setup() {
     mkdir -p bin lib skills/demo skills/_partials
     cp "$REPO_ROOT/install" install
     cp "$REPO_ROOT/lib/agents.sh" lib/agents.sh
+    cp "$REPO_ROOT/lib/cache.sh" lib/cache.sh
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" skills/demo/SKILL.md.tmpl
     cp "$FIXTURES_DIR/skills/_partials/global-flags.md" skills/_partials/global-flags.md
     cp "$FIXTURES_DIR/skills/_partials/update-check.md" skills/_partials/update-check.md
@@ -71,6 +72,7 @@ EOF
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -f "$HOME/.config/kstack/lib/agents.sh" ]
+  [ -f "$HOME/.config/kstack/lib/cache.sh" ]
 }
 
 @test "install --global re-run uses fetch+checkout path" {

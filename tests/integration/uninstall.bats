@@ -61,40 +61,14 @@ setup() {
   [ ! -e "$HOME/.config/kstack" ]
 }
 
-@test "uninstall with nothing installed prints 'Nothing to remove'" {
-  # Clear pre-seeded state.
-  rm -rf "$HOME/.claude" "$HOME/.codex"
-  # Keep config dir to prove it's still detected by itself.
-  rm -rf "$HOME/.config/kstack"
-  # But we need the uninstall script to still exist somewhere. Re-stage bin+lib.
-  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/lib"
-  cp "$REPO_ROOT/bin/uninstall" "$HOME/.config/kstack/bin/uninstall"
-  cp "$REPO_ROOT/lib/agents.sh" "$HOME/.config/kstack/lib/agents.sh"
-  chmod +x "$HOME/.config/kstack/bin/uninstall"
-  # Now kstack config dir exists with just the uninstall script — that still
-  # shows up in preview. So this test can only check that Nothing-to-remove
-  # happens when the config dir itself is absent.
-  run bash -c "rm -rf '$HOME/.config/kstack' && '$UNINSTALL' --force 2>&1 || echo exit=\$?"
-  # After deleting the config dir, the script binary is gone too, so exit=127.
-  [[ "$output" == *"exit=127"* || "$status" -eq 127 ]]
-}
-
 @test "uninstall exits 1 when not invoked from ~/.config/kstack/bin" {
-  # Copy uninstall to an unrelated location.
-  OTHER="$TMPDIR_TEST/elsewhere"
-  mkdir -p "$OTHER"
-  cp "$REPO_ROOT/bin/uninstall" "$OTHER/uninstall"
-  cp -R "$REPO_ROOT/lib" "$TMPDIR_TEST/lib"  # lib needs to be discoverable
+  local elsewhere="$TMPDIR_TEST/elsewhere/bin"
+  mkdir -p "$elsewhere" "$TMPDIR_TEST/elsewhere/lib"
+  cp "$REPO_ROOT/bin/uninstall" "$elsewhere/uninstall"
+  cp "$REPO_ROOT/lib/agents.sh" "$TMPDIR_TEST/elsewhere/lib/agents.sh"
+  chmod +x "$elsewhere/uninstall"
 
-  # Place lib one level up from the uninstall copy so the auto-discover works.
-  mkdir -p "$TMPDIR_TEST/lib2"
-  cp "$REPO_ROOT/lib/agents.sh" "$TMPDIR_TEST/lib2/agents.sh"
-  mkdir -p "$TMPDIR_TEST/combined/bin" "$TMPDIR_TEST/combined/lib"
-  cp "$REPO_ROOT/bin/uninstall" "$TMPDIR_TEST/combined/bin/uninstall"
-  cp "$REPO_ROOT/lib/agents.sh" "$TMPDIR_TEST/combined/lib/agents.sh"
-  chmod +x "$TMPDIR_TEST/combined/bin/uninstall"
-
-  run "$TMPDIR_TEST/combined/bin/uninstall" --force
+  run "$elsewhere/uninstall" --force
   [ "$status" -eq 1 ]
   [[ "$output" == *"global uninstaller"* ]]
 }

@@ -8,39 +8,15 @@ setup() {
   common_setup
   use_mocks
 
-  # curl stub — emits a minimal JSON payload including tag_name.
-  write_stub curl '
-if [[ "$*" == *"api.github.com"* ]]; then
-  printf "%s\n" "{\"tag_name\": \"v9.9.9\"}"
-  exit 0
-fi
-exit 1
-'
-
-  # git stub — intercepts only the `git clone ... https://github.com/...` call
-  # scripts/install.sh makes. Everything else delegates to real git.
+  # Build a local bare repo that our git stub will redirect the clone to.
   REAL_GIT="$(command -v git)"
-  write_stub git "
-REAL_GIT=$REAL_GIT
-# Rewrite the upstream URL to our local bare repo for any clone/fetch.
-args=()
-for a in \"\$@\"; do
-  case \"\$a\" in
-    https://github.com/kubetail-org/kstack.git) args+=(\"$BARE_REPO\") ;;
-    *) args+=(\"\$a\") ;;
-  esac
-done
-exec \"\$REAL_GIT\" \"\${args[@]}\"
-"
-
-  # Build a local bare repo that the rewritten clone can hit.
   BARE_REPO="$TMPDIR_TEST/fake.git"
-  WORK="$TMPDIR_TEST/fake-work"
-  mkdir -p "$BARE_REPO" "$WORK"
+  local work="$TMPDIR_TEST/fake-work"
+  mkdir -p "$BARE_REPO" "$work"
   "$REAL_GIT" init --quiet --bare "$BARE_REPO"
-  "$REAL_GIT" -c init.defaultBranch=main init --quiet "$WORK"
+  "$REAL_GIT" -c init.defaultBranch=main init --quiet "$work"
   (
-    cd "$WORK"
+    cd "$work"
     "$REAL_GIT" config user.email "test@example.com"
     "$REAL_GIT" config user.name "Test"
     cat > install <<'EOF'
@@ -57,7 +33,17 @@ EOF
     "$REAL_GIT" push --quiet origin v9.9.9
   )
 
-  # Now re-emit the git stub with BARE_REPO filled in.
+  # curl stub: emit tag_name; real curl isn't wanted.
+  write_stub curl '
+if [[ "$*" == *"api.github.com"* ]]; then
+  printf "%s\n" "{\"tag_name\": \"v9.9.9\"}"
+  exit 0
+fi
+exit 1
+'
+
+  # git stub: rewrite the upstream URL to our local bare repo; delegate everything
+  # else to real git.
   write_stub git "
 REAL_GIT=$REAL_GIT
 args=()
@@ -79,7 +65,6 @@ exec \"\$REAL_GIT\" \"\${args[@]}\"
 }
 
 @test "scripts/install.sh exits 1 when GitHub API yields no tag" {
-  # Overwrite curl stub to emit empty payload.
   write_stub curl 'echo "{}"; exit 0'
   run "$REPO_ROOT/scripts/install.sh"
   [ "$status" -eq 1 ]

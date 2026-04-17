@@ -9,42 +9,31 @@
 
 set -u
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+# shellcheck source=../lib/cache.sh
+. "$SCRIPT_DIR/../lib/cache.sh"
+
 main() {
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-  if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
-    INSTALL_ROOT="$HOME/.config/kstack"
-    CACHE_DIR="$INSTALL_ROOT/cache"
-  else
-    INSTALL_ROOT="$(dirname "$SCRIPT_DIR")"
-    CACHE_DIR="$INSTALL_ROOT/.cache/kstack"
-  fi
-
-  CACHE_FILE="$CACHE_DIR/update.json"
+  resolve_cache_paths "$SCRIPT_DIR"
 
   if [ ! -f "$CACHE_FILE" ]; then
     echo "Nothing to dismiss — no update check has run yet."
     exit 0
   fi
 
-  cache_ts="$(sed -n 's/.*"last_check"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
-  cache_latest="$(sed -n 's/.*"latest_known"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
+  local cache_ts cache_latest cache_dismissed
+  read_cache_fields "$CACHE_FILE"
 
   if [ -z "$cache_latest" ]; then
     echo "Nothing to dismiss — no known available release."
     exit 0
   fi
 
-  now_iso="${cache_ts:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"
-
-  cat > "$CACHE_FILE.tmp" <<EOF
-{
-  "last_check": "$now_iso",
-  "latest_known": "$cache_latest",
-  "dismissed_version": "$cache_latest"
-}
-EOF
-  mv "$CACHE_FILE.tmp" "$CACHE_FILE"
+  write_cache_json "$CACHE_FILE" \
+    "${cache_ts:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}" \
+    "$cache_latest" \
+    "$cache_latest"
 
   echo "Dismissed update notice for kstack $cache_latest. You'll be notified again when a newer release is published."
 }
