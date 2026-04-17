@@ -35,20 +35,22 @@ Our goal is to help bring the power of AI to K8s monitoring in a user-friendly a
 
 ## Quickstart
 
-To use kstack just clone the repo and open a Claude Code session:
+To use kstack just clone this repo and open a Claude Code session inside the repo directory:
 
 ```console
 git clone https://github.com/kubetail-org/kstack.git
 cd kstack && claude
 ```
 
-The repo itself already has the skills installed (in `.claude/skills`) so you can start using them right away:
+The repo already has the kstack skills installed (in `.claude/skills`) so you can start using them right away:
 
 ```console
 ──────────────────────────────────────────────────
 > /cluster-status
 ──────────────────────────────────────────────────
 ```
+
+Kstack uses your local `kubeconfig` file for authentication so it will be able to perform any actions that you can with `kubectl`. If it runs into permissions problems, it will let you know.
 
 To install kstack globally, clone the repo into your user-level skills directory and run the `setup` script to symlink the skill set:
 
