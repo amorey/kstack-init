@@ -1,6 +1,6 @@
 # kstack
 
-*Skill pack for Claude that helps you monitor your K8s clusters superintelligently*
+*Skill pack for Claude Code that helps you monitor your K8s clusters superintelligently*
 
 <a href="https://discord.gg/CmsmWAVkvX"><img src="https://img.shields.io/discord/1212031524216770650?logo=Discord&style=flat-square&logoColor=FFFFFF&labelColor=5B65F0&label=Discord&color=64B73A"></a>
 [![Slack](https://img.shields.io/badge/Slack-kubetail-364954?logo=slack&labelColor=4D1C51)](https://kubernetes.slack.com/archives/C08SHG1GR37)
@@ -11,7 +11,7 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 
 ## Introduction
 
-**Kstack** is a skill pack for Claude that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart, fast, and cost-effective way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process and filter node-level data at the source before sending it back to Claude for analysis. It also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium).
+**Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart, fast, and cost-effective way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process and filter node-level data at the source before sending it back to Claude for analysis. This makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium).
 
 Once you install kstack you'll have access to a set of K8s commands inside Claude Code:
 
