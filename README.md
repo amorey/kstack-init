@@ -1,6 +1,6 @@
 # kstack
 
-**Kstack is a skill pack for Claude that helps you monitor K8s superintelligently**
+*Skill pack for Claude that helps you monitor your K8s clusters superintelligently*
 
 <a href="https://discord.gg/CmsmWAVkvX"><img src="https://img.shields.io/discord/1212031524216770650?logo=Discord&style=flat-square&logoColor=FFFFFF&labelColor=5B65F0&label=Discord&color=64B73A"></a>
 [![Slack](https://img.shields.io/badge/Slack-kubetail-364954?logo=slack&labelColor=4D1C51)](https://kubernetes.slack.com/archives/C08SHG1GR37)
@@ -11,18 +11,43 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 
 ## Introduction
 
-**Kstack** is a skill pack for Claude that helps you to perform monitoring and troubleshooting tasks on your K8s cluster in a smart, fast and cost effective way. In addition to using tools like `kubectl` and `aws`, kstack also uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process and filter node-level data at the source before sending it back to Claude for analysis. Once you install kstack you'll have access to several K8s-related commands you can use inside Claude Code. Here are some common commands:
+**Kstack** is a skill pack for Claude that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart, fast, and cost-effective way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process and filter node-level data at the source before sending it back to Claude for analysis. It also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium).
 
-* `/health` - Perform a global health check (e.g. restarts, cpu, memory, disk)
-* `/security-check` - Look at RBAC permissions and make privilege tightening suggestions
-* `/network-check` - Look at `NetworkPolicy` and `Service` resources and make suggestions
-* `/logs` - Fetch container logs with remote-grep capability
+Once you install kstack you'll have access to a set of K8s commands inside Claude Code:
 
-Our goal is to help bring the power of AI to K8s monitoring in a fun, cost-effective way that keeps you in control. If you notice a bug or have a suggestion please create a GitHub Issue or send us an email (hello@kubetail.com)!
+**Monitoring**
+* `/health` — Cluster-wide health snapshot: restarts, resource pressure, failing pods, node conditions
+* `/events` — Recent cluster events, filtered and ranked by severity
+
+**Troubleshooting**
+* `/debug <resource>` — Deep-dive investigation: events, logs, related resources, recent changes
+* `/why <pod>` — Diagnose why a pod is pending, crashlooping, or OOMKilled
+* `/logs` — Fetch container logs with node-side grep via kubetail (no full-log transfer)
+
+**Audits**
+* `/security` — RBAC audit, pod security posture, and privilege tightening suggestions
+* `/network` — NetworkPolicy, Service, Ingress, and DNS sanity checks
+* `/cost` — Requests vs. usage, over-provisioned workloads, idle capacity
+* `/upgrade-check` — Deprecated APIs and version skew before a cluster upgrade
+
+Our goal is to help bring the power of AI to K8s monitoring in a user-friendly and cost-effective way that keeps you in control. If you notice a bug or have a suggestion please create a GitHub Issue or send us an email (hello@kubetail.com)!
 
 ## Quickstart
 
-To install kstack, just clone the repo into your skills directory and run the `setup` script:
+To use kstack just clone the repo and open a Claude Code session:
+
+```console
+git clone https://github.com/kubetail-org/kstack.git
+cd kstack && claude
+```
+
+The repo itself already has the skills installed (in `.claude/skills`) so you can start using them right away:
+
+```console
+> /health
+```
+
+To install kstack globally, clone the repo into your user-level skills directory and run the `setup` script to symlink the skill set:
 
 ```console
 cd ~/.claude/skills
@@ -30,7 +55,7 @@ git clone https://github.com/kubetail-org/kstack.git
 cd kstack && ./setup
 ```
 
-Alternatively you can open a Claude Code session and paste in this prompt:
+Alternatively, you can open a Claude Code session and paste in this prompt:
 
 ```console
 Install kstack: run `git clone --single-branch --depth https://github.com/kubetail-org/kstack.git` ~/.claude/skills/kstack && cd ~/.claude/skills/kstack && ./setup`
@@ -38,8 +63,7 @@ Install kstack: run `git clone --single-branch --depth https://github.com/kubeta
 
 ## Other AI Agents
 
-Kstack works with all AI coding agents that support skills, not just Claude. The `setup` script auto-detects which
-agents you have installed:
+Kstack can work with any AI agent that support skills, not just Claude. To install kstack in your other AI agents just run the `setup` script manually and it will auto-detect which agents you have installed:
 
 ```console
 git clone https://github.com/kubetail-org/kstack.git
@@ -67,10 +91,6 @@ git clone https://github.com/kubetail-org/kstack.git
 ./kstack/bin/uninstall
 rm -rf kstack
 ```
-
-## Privacy and Telemetry
-
-Kstack doesn't collect any telemetry information. To help us improve the project your feedback is very welcome.
 
 ## Reference
 
