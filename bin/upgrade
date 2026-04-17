@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# kstack upgrade — re-run install against the maintained checkout at the
+# latest tag (global mode), or `git pull && ./install` (repo-local mode).
+# Detects its mode from its own install location.
+
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
+  exec "$HOME/.config/kstack/src/install" --global "$@"
+fi
+
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$REPO_ROOT"
+git pull --ff-only
+exec ./install "$@"

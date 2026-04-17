@@ -211,10 +211,13 @@ if [ -z "$SKILL_NAMES" ]; then
 fi
 
 GLOBAL_FLAGS_PARTIAL="$SKILLS_SRC/_partials/global-flags.md"
-if [ ! -f "$GLOBAL_FLAGS_PARTIAL" ]; then
-  echo "ERROR: missing partial: $GLOBAL_FLAGS_PARTIAL" >&2
-  exit 1
-fi
+UPDATE_CHECK_PARTIAL="$SKILLS_SRC/_partials/update-check.md"
+for p in "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"; do
+  if [ ! -f "$p" ]; then
+    echo "ERROR: missing partial: $p" >&2
+    exit 1
+  fi
+done
 
 # ─── Render + install ─────────────────────────────────────────
 # render_skill $skill $agent $install_root $bin_dir $out_file
@@ -222,10 +225,14 @@ render_skill() {
   local skill="$1" agent="$2" install_root="$3" bin_dir="$4" out_file="$5"
   local src="$SKILLS_SRC/$skill/SKILL.md.tmpl"
   mkdir -p "$(dirname "$out_file")"
-  awk -v p="$GLOBAL_FLAGS_PARTIAL" '
+  awk -v gf="$GLOBAL_FLAGS_PARTIAL" -v uc="$UPDATE_CHECK_PARTIAL" '
     /\{\{GLOBAL_FLAGS\}\}/ {
-      while ((getline line < p) > 0) print line
-      close(p); next
+      while ((getline line < gf) > 0) print line
+      close(gf); next
+    }
+    /\{\{UPDATE_CHECK\}\}/ {
+      while ((getline line < uc) > 0) print line
+      close(uc); next
     }
     { print }
   ' "$src" | sed \
@@ -285,30 +292,22 @@ copy_bin_global() {
     [ -e "$f" ] || continue
     case "$(basename "$f")" in .gitkeep) continue ;; esac
     cp "$f" "$KSTACK_GLOBAL_BIN/"
+    chmod +x "$KSTACK_GLOBAL_BIN/$(basename "$f")"
   done
   log "  bin/ → $KSTACK_GLOBAL_BIN"
-}
-
-write_upgrade_wrapper() {
-  cat > "$KSTACK_GLOBAL_BIN/upgrade" <<'WRAPPER'
-#!/usr/bin/env bash
-# kstack upgrade — re-runs install against the maintained checkout at latest tag.
-exec "$HOME/.config/kstack/src/install" --global "$@"
-WRAPPER
-  chmod +x "$KSTACK_GLOBAL_BIN/upgrade"
-  log "  upgrade → $KSTACK_GLOBAL_BIN/upgrade"
 }
 
 # ─── Go ────────────────────────────────────────────────────────
 if [ "$GLOBAL" -eq 1 ]; then
   log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
+  mkdir -p "$KSTACK_CONFIG_DIR/cache"
   copy_bin_global
-  write_upgrade_wrapper
   for h in $TARGET_AGENTS; do
     install_agent_global "$h"
   done
 else
   log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
+  mkdir -p "$SCRIPT_DIR/.cache/kstack"
   for h in $TARGET_AGENTS; do
     install_agent_local "$h"
   done
@@ -318,8 +317,8 @@ log ""
 log "kstack installed. Start a session with your agent to use the skills."
 if [ "$GLOBAL" -eq 1 ]; then
   log "To upgrade:   $KSTACK_GLOBAL_BIN/upgrade"
-  log "To uninstall: $KSTACK_GLOBAL_BIN/uninstall --global"
+  log "To uninstall: $KSTACK_GLOBAL_BIN/uninstall"
 else
   log "To upgrade:   git pull && ./install"
-  log "To uninstall: ./bin/uninstall --local"
+  log "To uninstall: delete this kstack repo directory."
 fi

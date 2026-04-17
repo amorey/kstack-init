@@ -9,6 +9,7 @@ Overall plan from README-finished to v0.1.0 launch. Grouped by phase; within eac
 - [x] Build `uninstall` script
 - [x] Shared global flag handling — `--context`, `--namespace`, `--json`, `--dry-run` across every skill
 - [x] Upgrade path — `git pull && ./install` (repo-local); `~/.config/kstack/bin/upgrade` wrapper and `curl | bash` bootstrap at `kubestack.xyz/install.sh` for global installs (tracks latest tag)
+- [x] Update notifications — `bin/check-update` runs from skill preamble on each invocation (24h cache, both modes), `bin/dismiss-update` silences per-version, `bin/upgrade` mode-aware; all three agent-invoked, not user-facing
 
 ## Pilot skill + testing
 

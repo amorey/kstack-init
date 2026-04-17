@@ -330,25 +330,29 @@ Outdated cluster components, known CVEs, and available version bumps.
 
 ## Upgrade
 
-For a global install, run the upgrade helper bundled at `~/.config/kstack/bin/`:
+When you run a kstack skill, Claude quietly checks whether a newer kstack release is available and surfaces a one-line notice at the top of its response when it finds one. Just say **"upgrade kstack"** and the agent will run the kstack upgrade script on your behalf; say **"dismiss"** to hide the notice until the next release. This works the same for both global and repo-local installs.
+
+You can also run the helpers directly:
 
 ```console
+# Global install
 ~/.config/kstack/bin/upgrade
+
+# Repo-local install
+git pull && ./install
 ```
 
-It checks out the latest tagged release in the kstack-owned checkout at `~/.config/kstack/src/` and re-runs the installer. Upgrade is idempotent — safe to re-run at any time.
-
-For a repo-local install, `git pull && ./install` from inside the repo.
+Upgrades are idempotent and safe to run any time.
 
 ## Uninstall
 
 For a global install, run the uninstall helper bundled at `~/.config/kstack/bin/`:
 
 ```console
-~/.config/kstack/bin/uninstall --global
+~/.config/kstack/bin/uninstall
 ```
 
-For a repo-local install, run `./bin/uninstall --local` from inside the repo. Running `./bin/uninstall` with no scope flag removes both installs if both exist.
+For a repo-local install, just delete the kstack repo directory. The local install renders skills directly into `<repo>/.<agent>/skills/` and never writes outside the repo, so there is nothing else to clean up.
 
 ## Get Involved
 
