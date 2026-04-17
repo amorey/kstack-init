@@ -2,7 +2,7 @@
 
 *Skill pack for Claude Code that helps you monitor your K8s clusters superintelligently*
 
-<img height="200" alt="kstack" src="assets/kstack.svg" />
+<img width="350" alt="kstack" src="assets/kstack.svg" />
 
 <a href="https://discord.gg/CmsmWAVkvX"><img src="https://img.shields.io/discord/1212031524216770650?logo=Discord&style=flat-square&logoColor=FFFFFF&labelColor=5B65F0&label=Discord&color=64B73A"></a>
 [![Slack](https://img.shields.io/badge/Slack-kubetail-364954?logo=slack&labelColor=4D1C51)](https://kubernetes.slack.com/archives/C08SHG1GR37)
