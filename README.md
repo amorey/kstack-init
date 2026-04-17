@@ -114,7 +114,7 @@ Each skill is invoked with `/<name>` inside a Claude Code session. All skills ar
 </dt>
 <dd>
 
-Health snapshot across the whole cluster.
+Health snapshot across the entire cluster.
 
 **What it checks:** pod phase distribution, restart counts, node `Ready`/`MemoryPressure`/`DiskPressure`/`PIDPressure` conditions, unschedulable pods, workload replica drift (desired vs. ready), and PDB violations.
 
@@ -225,9 +225,9 @@ Guided shell into a pod's container with diagnostics pre-loaded.
 </dt>
 <dd>
 
-Fetch and filter container logs with kubetail's node-side grep.
+Fetch and filter container logs with kubetail's remote grep feature.
 
-**Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to Claude. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs the regex filter on the node where the log lives and only sends matching lines back. Typical 100x reduction in transferred data.
+**Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to Claude. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs a Rust-powered regex filter on the node where the log lives and only sends matching lines back. This can reduce transferred data dramatically.
 
 **Arguments (all optional, composable):**
 - `--selector <label>` — label selector across pods (e.g. `app=api`)
