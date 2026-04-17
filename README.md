@@ -45,9 +45,9 @@ cd kstack && claude
 The repo itself already has the skills installed (in `.claude/skills`) so you can start using them right away:
 
 ```console
-─────────────────────────
-> /health
-─────────────────────────
+──────────────────────────────────────────────────
+> /cluster-status
+──────────────────────────────────────────────────
 ```
 
 To install kstack globally, clone the repo into your user-level skills directory and run the `setup` script to symlink the skill set:
