@@ -2,6 +2,10 @@
 
 Overall plan from README-finished to v0.1.0 launch. Grouped by phase; within each phase items are roughly ordered.
 
+## MISC
+
+- [ ] Add a clean-up skill that removes all "kstack-managed" cluster resources
+
 ## Foundation
 
 - [x] Scaffold repo layout — `.claude/skills/`, `bin/`, `skills/*/SKILL.md.tmpl`, document placeholder resolution convention
