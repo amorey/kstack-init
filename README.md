@@ -37,7 +37,21 @@ Our goal is to bring the power of AI to K8s monitoring in a user-friendly and co
 
 ## Quickstart
 
-To use kstack, clone this repo, run `./install`, then open a Claude Code session inside the repo:
+To install kstack globally so you can use the skills from a Claude Code session inside any project run:
+
+```console
+curl -sS https://www.kubestack.xyz/install.sh | bash
+```
+
+This will run a bootstrap script that installs the kstack skills into your user-level skills directory (e.g. `~/.claude/skills`) with names prefixed with `/kstack-*`. It will detect all available agents and install into each of their skills directories (e.g. Codex, OpenCode). After installation, the skills will be available when you start a session in an project:
+
+```console
+──────────────────────────────────────────────────
+> /kstack-cluster-status
+──────────────────────────────────────────────────
+```
+
+To use kstack locally without modifying your global skills, you can clone this repo, run `./install`, then open a Claude Code session inside the repo:
 
 ```console
 git clone https://github.com/kubetail-org/kstack.git
@@ -54,19 +68,9 @@ cd kstack && ./install && claude
 
 Kstack uses your local `kubeconfig` file for authentication so it will be able to use your RBAC permissions to perform actions on your behalf. If it runs into permissions problems, it will let you know.
 
-## Install globally
-
-To install kstack globally so you can use the skills from a Claude Code session inside any project run:
-
-```console
-curl -sS https://www.kubestack.xyz/install.sh | bash
-```
-
-The bootstrap script resolves the latest release, clones a kstack-owned checkout into `~/.config/kstack/src/`, and renders skills into each detected agent's user-level skills directory (e.g. `~/.<agent>/skills/kstack-*/`). Helper binaries are copied to `~/.config/kstack/bin/`. Nothing else is placed anywhere under `~/`.
-
 ## Other AI Agents
 
-Kstack works with any AI agent that supports skills, not just Claude. Both `./install` and the curl bootstrap auto-detect which agent CLIs are on your `PATH` and install for each. Target a specific agent with `--agent <name>`:
+Kstack works with any AI agent that supports skills, not just Claude. Both `./install` and the curl bootstrap auto-detect which agent CLIs are on your `PATH` and install for each. You can target a specific agent with `install --agent <name>`:
 
 | Agent            | Flag               | Global install path                   |
 |------------------|--------------------|---------------------------------------|
