@@ -37,14 +37,14 @@ Our goal is to bring the power of AI to K8s monitoring in a user-friendly and co
 
 ## Quickstart
 
-To use kstack just clone this repo and open a Claude Code session inside the repo directory:
+To use kstack, clone this repo, run `./install`, then open a Claude Code session inside the repo:
 
 ```console
 git clone https://github.com/kubetail-org/kstack.git
-cd kstack && claude
+cd kstack && ./install && claude
 ```
 
-The repo already has the kstack skills installed (in `.claude/skills`) so you can start using them right away:
+`./install` renders the skills into `.claude/skills/` (and the equivalent dir for any other agent CLI detected on your `PATH`), so they're discoverable the moment you start a session from the repo:
 
 ```console
 ──────────────────────────────────────────────────
@@ -54,44 +54,33 @@ The repo already has the kstack skills installed (in `.claude/skills`) so you ca
 
 Kstack uses your local `kubeconfig` file for authentication so it will be able to use your RBAC permissions to perform actions on your behalf. If it runs into permissions problems, it will let you know.
 
-To install kstack globally, clone the repo into your user-level skills directory and run the `setup` script to symlink the skill set:
+## Install globally
+
+To install kstack globally so you can use the skills from a Claude Code session inside any project run:
 
 ```console
-cd ~/.claude/skills
-git clone https://github.com/kubetail-org/kstack.git
-cd kstack && ./setup
+curl -sS https://www.kubestack.xyz/install.sh | bash
 ```
 
-Alternatively, you can open a Claude Code session and paste in this prompt:
-
-```console
-Install kstack: run `git clone --single-branch --depth https://github.com/kubetail-org/kstack.git` ~/.claude/skills/kstack && cd ~/.claude/skills/kstack && ./setup`
-```
-
-After installing kstack globally you'll be able to use the skills from inside any project.
+The bootstrap script resolves the latest release, clones a kstack-owned checkout into `~/.config/kstack/src/`, and renders skills into each detected agent's user-level skills directory (e.g. `~/.<agent>/skills/kstack-*/`). Helper binaries are copied to `~/.config/kstack/bin/`. Nothing else is placed anywhere under `~/`.
 
 ## Other AI Agents
 
-Kstack can work with any AI agent that support skills, not just Claude. To install kstack in your other AI agents just run the `setup` script manually and it will auto-detect which agents you have installed:
+Kstack works with any AI agent that supports skills, not just Claude. Both `./install` and the curl bootstrap auto-detect which agent CLIs are on your `PATH` and install for each. Target a specific agent with `--agent <name>`:
 
-```console
-git clone https://github.com/kubetail-org/kstack.git
-cd kstack && ./setup
-```
+| Agent            | Flag               | Global install path                   |
+|------------------|--------------------|---------------------------------------|
+| OpenAI Codex CLI | `--agent codex`    | `~/.codex/skills/kstack-*/`           |
+| OpenCode         | `--agent opencode` | `~/.config/opencode/skills/kstack-*/` |
+| Cursor           | `--agent cursor`   | `~/.cursor/skills/kstack-*/`          |
+| Factory Droid    | `--agent factory`  | `~/.factory/skills/kstack-*/`         |
+| Slate            | `--agent slate`    | `~/.slate/skills/kstack-*/`           |
+| Kiro             | `--agent kiro`     | `~/.kiro/skills/kstack-*/`            |
+| Hermes           | `--agent hermes`   | `~/.hermes/skills/kstack-*/`          |
 
-Or target a specific agent with `./setup --host <name>`:
+Repo-local installs mirror this structure under the repo (e.g. `<repo>/.codex/skills/`) and are used only when the agent is run from inside the repo.
 
-| Agent            | Flag              | Skills install to                     |
-|------------------|-------------------|---------------------------------------|
-| OpenAI Codex CLI | `--host codex`    | `~/.codex/skills/kstack-*/`           |
-| OpenCode         | `--host opencode` | `~/.config/opencode/skills/kstack-*/` |
-| Cursor           | `--host cursor`   | `~/.cursor/skills/kstack-*/`          |
-| Factory Droid    | `--host factory`  | `~/.factory/skills/kstack-*/`         |
-| Slate            | `--host slate`    | `~/.slate/skills/kstack-*/`           |
-| Kiro             | `--host kiro`     | `~/.kiro/skills/kstack-*/`            |
-| Hermes           | `--host hermes`   | `~/.hermes/skills/kstack-*/`          |
-
-## Skill Reference
+## Skills Reference
 
 Each skill is invoked with `/<name>` inside a Claude Code session. All skills are read-only by default — any action that mutates cluster state requires explicit confirmation. Skills honor your local `kubeconfig` context and respect RBAC.
 
@@ -339,15 +328,27 @@ Outdated cluster components, known CVEs, and available version bumps.
 </dd>
 </dl>
 
-## Uninstall
+## Upgrade
 
-To uninstall kstack, run the `uninstall` script then delete the repo:
+For a global install, run the upgrade helper bundled at `~/.config/kstack/bin/`:
 
 ```console
-git clone https://github.com/kubetail-org/kstack.git
-./kstack/bin/uninstall
-rm -rf kstack
+~/.config/kstack/bin/upgrade
 ```
+
+It checks out the latest tagged release in the kstack-owned checkout at `~/.config/kstack/src/` and re-runs the installer. Upgrade is idempotent — safe to re-run at any time.
+
+For a repo-local install, `git pull && ./install` from inside the repo.
+
+## Uninstall
+
+For a global install, run the uninstall helper bundled at `~/.config/kstack/bin/`:
+
+```console
+~/.config/kstack/bin/uninstall --global
+```
+
+For a repo-local install, run `./bin/uninstall --local` from inside the repo. Running `./bin/uninstall` with no scope flag removes both installs if both exist.
 
 ## Get Involved
 
@@ -361,5 +362,6 @@ Reach us at hello@kubetail.com, or join our [Discord server](https://discord.gg/
 
 ## Notes
 
-* Thank you to Garry Tan's [gstack](https://github.com/garrytan/gstack) 
-* Made with 🧿 in Istanbul
+* Thank you to Garry Tan's [gstack](https://github.com/garrytan/gstack) for the initial inspiration
+
+Made with 🧿 in Istanbul

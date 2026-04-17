@@ -1,0 +1,325 @@
+#!/usr/bin/env bash
+# kstack install — install kstack skills for one or more AI agents.
+#
+# Two install modes:
+#
+#   Repo-local (default) — for the `cd kstack && claude` flow.
+#     Renders each skills/<skill>/SKILL.md.tmpl directly into
+#     <repo>/.<agent>/skills/<skill>/SKILL.md. Skills are discovered
+#     from the repo when the agent is invoked from inside it.
+#
+#   Global (--global) — for ambient use outside the repo.
+#     Maintains a kstack-owned checkout at ~/.config/kstack/src/ at the
+#     latest released tag, then renders skills from there into
+#     ~/.<agent>/skills/kstack-<skill>/SKILL.md and copies helper binaries
+#     into ~/.config/kstack/bin/. The invoker's checkout is never used
+#     as the source in global mode — the canonical upstream is cloned
+#     fresh so running `./install --global` from a fork cannot silently
+#     install the fork's contents.
+#
+# Upgrade:
+#     Repo-local: `git pull && ./install`
+#     Global:     `~/.config/kstack/bin/upgrade` (wrapper that re-runs
+#                 this script at the latest tag — see below).
+#
+# Usage:
+#   ./install                        Repo-local, auto-detect agents (falls back to claude).
+#   ./install --agent <name>         Limit to one agent.
+#   ./install --global               Global install for auto-detected agents.
+#   ./install --global --agent <n>   Global install, one agent.
+#   ./install -q | --quiet           Suppress log output.
+#
+# Supported agents: claude, codex, opencode, cursor, factory, slate, kiro, hermes
+
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+KSTACK_CONFIG_DIR="$HOME/.config/kstack"
+KSTACK_GLOBAL_BIN="$KSTACK_CONFIG_DIR/bin"
+KSTACK_SRC="$KSTACK_CONFIG_DIR/src"
+# Canonical upstream. Override via KSTACK_REMOTE_URL env var (useful for CI
+# and testing against a local clone); leave unset for normal user installs.
+KSTACK_REMOTE_URL="${KSTACK_REMOTE_URL:-https://github.com/kubetail-org/kstack.git}"
+
+KNOWN_AGENTS="claude codex opencode cursor factory slate kiro hermes"
+
+# agent_cli: CLI binary to probe for auto-detect
+agent_cli() {
+  case "$1" in
+    claude)   echo claude ;;
+    codex)    echo codex ;;
+    opencode) echo opencode ;;
+    cursor)   echo cursor ;;
+    factory)  echo droid ;;
+    slate)    echo slate ;;
+    kiro)     echo kiro-cli ;;
+    hermes)   echo hermes ;;
+    *)        return 1 ;;
+  esac
+}
+
+# agent_skills_dir_global: where the agent reads skills from (user-level)
+agent_skills_dir_global() {
+  case "$1" in
+    claude)   echo "$HOME/.claude/skills" ;;
+    codex)    echo "$HOME/.codex/skills" ;;
+    opencode) echo "$HOME/.config/opencode/skills" ;;
+    cursor)   echo "$HOME/.cursor/skills" ;;
+    factory)  echo "$HOME/.factory/skills" ;;
+    slate)    echo "$HOME/.slate/skills" ;;
+    kiro)     echo "$HOME/.kiro/skills" ;;
+    hermes)   echo "$HOME/.hermes/skills" ;;
+    *)        return 1 ;;
+  esac
+}
+
+# agent_skills_dir_local: where the agent reads skills from (repo-level)
+agent_skills_dir_local() {
+  local root="$1"
+  case "$2" in
+    claude)   echo "$root/.claude/skills" ;;
+    codex)    echo "$root/.codex/skills" ;;
+    opencode) echo "$root/.config/opencode/skills" ;;
+    cursor)   echo "$root/.cursor/skills" ;;
+    factory)  echo "$root/.factory/skills" ;;
+    slate)    echo "$root/.slate/skills" ;;
+    kiro)     echo "$root/.kiro/skills" ;;
+    hermes)   echo "$root/.hermes/skills" ;;
+    *)        return 1 ;;
+  esac
+}
+
+is_known_agent() {
+  case " $KNOWN_AGENTS " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
+# ─── Flags ────────────────────────────────────────────────────
+QUIET=0
+AGENT=""
+GLOBAL=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --agent)
+      [ -z "${2:-}" ] && { echo "Missing value for --agent" >&2; exit 1; }
+      AGENT="$2"; shift 2 ;;
+    --agent=*) AGENT="${1#--agent=}"; shift ;;
+    --global) GLOBAL=1; shift ;;
+    -q|--quiet) QUIET=1; shift ;;
+    -h|--help)
+      sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
+      exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
+
+# ─── Determine target agents ───────────────────────────────────
+TARGET_AGENTS=""
+if [ -z "$AGENT" ] || [ "$AGENT" = "auto" ]; then
+  for h in $KNOWN_AGENTS; do
+    cli="$(agent_cli "$h")"
+    if command -v "$cli" >/dev/null 2>&1; then
+      TARGET_AGENTS="$TARGET_AGENTS $h"
+    fi
+  done
+  if [ -z "$TARGET_AGENTS" ]; then
+    log "No agent CLIs detected on PATH — installing for claude by default."
+    TARGET_AGENTS="claude"
+  fi
+else
+  if ! is_known_agent "$AGENT"; then
+    echo "Unknown agent: $AGENT" >&2
+    echo "Supported: $KNOWN_AGENTS" >&2
+    exit 1
+  fi
+  TARGET_AGENTS="$AGENT"
+fi
+
+TARGET_AGENTS="$(echo "$TARGET_AGENTS" | awk '{$1=$1; print}')"
+
+# ─── Maintained checkout (global mode only) ───────────────────
+# Clones (first time) or fetches+checks-out (subsequent runs) the canonical
+# upstream at the latest tagged release. Fresh-install tag resolution uses
+# `git ls-remote` so no local clone is needed to begin with; upgrade uses the
+# local clone's refs. Pre-release fallback: if no `v*` tags exist anywhere,
+# use `main` with a visible warning.
+ensure_src_checkout() {
+  mkdir -p "$KSTACK_CONFIG_DIR"
+
+  if [ -d "$KSTACK_SRC/.git" ]; then
+    log "Updating $KSTACK_SRC"
+    git -C "$KSTACK_SRC" fetch --tags --quiet origin
+    local tag
+    tag="$(git -C "$KSTACK_SRC" tag -l 'v*' --sort=-v:refname | head -1)"
+    if [ -n "$tag" ]; then
+      git -C "$KSTACK_SRC" checkout --quiet "$tag"
+      echo "$tag" > "$KSTACK_CONFIG_DIR/install.conf"
+      log "  checked out $tag"
+    else
+      log "  no tagged release found; tracking main"
+      git -C "$KSTACK_SRC" checkout --quiet main
+      git -C "$KSTACK_SRC" pull --ff-only --quiet origin main
+      echo "main" > "$KSTACK_CONFIG_DIR/install.conf"
+    fi
+  else
+    local tag
+    tag="$(git ls-remote --tags "$KSTACK_REMOTE_URL" 'v*' 2>/dev/null \
+      | awk -F'refs/tags/' '/refs\/tags\/v[0-9]/ && !/\^\{\}$/ { print $2 }' \
+      | sort -V | tail -1)"
+    if [ -n "$tag" ]; then
+      log "Cloning kstack @ $tag into $KSTACK_SRC"
+      git clone --depth 1 --branch "$tag" --quiet "$KSTACK_REMOTE_URL" "$KSTACK_SRC"
+      echo "$tag" > "$KSTACK_CONFIG_DIR/install.conf"
+    else
+      log "No tagged release found; cloning main into $KSTACK_SRC"
+      git clone --depth 1 --branch main --quiet "$KSTACK_REMOTE_URL" "$KSTACK_SRC"
+      echo "main" > "$KSTACK_CONFIG_DIR/install.conf"
+    fi
+  fi
+}
+
+# ─── Resolve render source ────────────────────────────────────
+if [ "$GLOBAL" -eq 1 ]; then
+  ensure_src_checkout
+  SRC_ROOT="$KSTACK_SRC"
+else
+  SRC_ROOT="$SCRIPT_DIR"
+fi
+
+SKILLS_SRC="$SRC_ROOT/skills"
+BIN_DIR="$SRC_ROOT/bin"
+
+# ─── Discover skills ──────────────────────────────────────────
+if [ ! -d "$SKILLS_SRC" ]; then
+  echo "No skills/ directory at $SKILLS_SRC" >&2
+  exit 1
+fi
+
+SKILL_NAMES=""
+for d in "$SKILLS_SRC"/*/; do
+  [ -f "${d}SKILL.md.tmpl" ] || continue
+  SKILL_NAMES="$SKILL_NAMES $(basename "$d")"
+done
+SKILL_NAMES="$(echo "$SKILL_NAMES" | awk '{$1=$1; print}')"
+
+if [ -z "$SKILL_NAMES" ]; then
+  echo "No SKILL.md.tmpl files found under $SKILLS_SRC" >&2
+  exit 1
+fi
+
+GLOBAL_FLAGS_PARTIAL="$SKILLS_SRC/_partials/global-flags.md"
+if [ ! -f "$GLOBAL_FLAGS_PARTIAL" ]; then
+  echo "ERROR: missing partial: $GLOBAL_FLAGS_PARTIAL" >&2
+  exit 1
+fi
+
+# ─── Render + install ─────────────────────────────────────────
+# render_skill $skill $agent $install_root $bin_dir $out_file
+render_skill() {
+  local skill="$1" agent="$2" install_root="$3" bin_dir="$4" out_file="$5"
+  local src="$SKILLS_SRC/$skill/SKILL.md.tmpl"
+  mkdir -p "$(dirname "$out_file")"
+  awk -v p="$GLOBAL_FLAGS_PARTIAL" '
+    /\{\{GLOBAL_FLAGS\}\}/ {
+      while ((getline line < p) > 0) print line
+      close(p); next
+    }
+    { print }
+  ' "$src" | sed \
+    -e "s|{{INSTALL_ROOT}}|$install_root|g" \
+    -e "s|{{BIN_DIR}}|$bin_dir|g" \
+    -e "s|{{SKILL_NAME}}|$skill|g" \
+    -e "s|{{AGENT}}|$agent|g" \
+    > "$out_file"
+}
+
+install_agent_local() {
+  local agent="$1"
+  local skills_dir
+  skills_dir="$(agent_skills_dir_local "$SCRIPT_DIR" "$agent")"
+  mkdir -p "$skills_dir"
+
+  local installed=""
+  for skill in $SKILL_NAMES; do
+    local out_dir="$skills_dir/$skill"
+    local out_file="$out_dir/SKILL.md"
+    # If a stale symlink occupies the slot from an older setup, replace it.
+    if [ -L "$out_dir" ]; then rm -f "$out_dir"; fi
+    if [ -L "$out_file" ]; then rm -f "$out_file"; fi
+    mkdir -p "$out_dir"
+    render_skill "$skill" "$agent" "$SCRIPT_DIR" "$BIN_DIR" "$out_file"
+    installed="$installed $skill"
+  done
+
+  log "  $agent (local) → $skills_dir"
+  log "    installed:$installed"
+}
+
+install_agent_global() {
+  local agent="$1"
+  local skills_dir
+  skills_dir="$(agent_skills_dir_global "$agent")"
+  mkdir -p "$skills_dir"
+
+  local installed=""
+  for skill in $SKILL_NAMES; do
+    local out_dir="$skills_dir/kstack-$skill"
+    local out_file="$out_dir/SKILL.md"
+    if [ -L "$out_dir" ]; then rm -f "$out_dir"; fi
+    if [ -L "$out_file" ]; then rm -f "$out_file"; fi
+    mkdir -p "$out_dir"
+    render_skill "$skill" "$agent" "$KSTACK_CONFIG_DIR" "$KSTACK_GLOBAL_BIN" "$out_file"
+    installed="$installed kstack-$skill"
+  done
+
+  log "  $agent (global) → $skills_dir"
+  log "    installed:$installed"
+}
+
+copy_bin_global() {
+  mkdir -p "$KSTACK_GLOBAL_BIN"
+  for f in "$BIN_DIR"/*; do
+    [ -e "$f" ] || continue
+    case "$(basename "$f")" in .gitkeep) continue ;; esac
+    cp "$f" "$KSTACK_GLOBAL_BIN/"
+  done
+  log "  bin/ → $KSTACK_GLOBAL_BIN"
+}
+
+write_upgrade_wrapper() {
+  cat > "$KSTACK_GLOBAL_BIN/upgrade" <<'WRAPPER'
+#!/usr/bin/env bash
+# kstack upgrade — re-runs install against the maintained checkout at latest tag.
+exec "$HOME/.config/kstack/src/install" --global "$@"
+WRAPPER
+  chmod +x "$KSTACK_GLOBAL_BIN/upgrade"
+  log "  upgrade → $KSTACK_GLOBAL_BIN/upgrade"
+}
+
+# ─── Go ────────────────────────────────────────────────────────
+if [ "$GLOBAL" -eq 1 ]; then
+  log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
+  copy_bin_global
+  write_upgrade_wrapper
+  for h in $TARGET_AGENTS; do
+    install_agent_global "$h"
+  done
+else
+  log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
+  for h in $TARGET_AGENTS; do
+    install_agent_local "$h"
+  done
+fi
+
+log ""
+log "kstack installed. Start a session with your agent to use the skills."
+if [ "$GLOBAL" -eq 1 ]; then
+  log "To upgrade:   $KSTACK_GLOBAL_BIN/upgrade"
+  log "To uninstall: $KSTACK_GLOBAL_BIN/uninstall --global"
+else
+  log "To upgrade:   git pull && ./install"
+  log "To uninstall: ./bin/uninstall --local"
+fi

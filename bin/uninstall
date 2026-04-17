@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# kstack uninstall — remove kstack skill installs from all agents.
+#
+# Usage:
+#   ./bin/uninstall              Interactive — prompts before removing.
+#   ./bin/uninstall --force      Remove without prompting.
+#   ./bin/uninstall --agent <n>  Scope to one agent.
+#   ./bin/uninstall --global     Remove only the global install.
+#   ./bin/uninstall --local      Remove only the repo-local install.
+#
+# What gets removed:
+#   Global mode:
+#     ~/.claude/skills/kstack-*/   (and equivalents for every supported agent)
+#     ~/.config/kstack/            (bin helpers + anything else kstack owns)
+#   Local mode:
+#     <repo>/.claude/skills/       (and equivalents for every supported agent)
+#
+# Legacy cleanup (older installs):
+#   <repo>/.build/                 (no longer used; removed if present)
+#
+# The kstack repo itself is NOT removed — delete it yourself after running this.
+#
+# Uses `set -uo pipefail` (no -e) so uninstall never aborts partway.
+set -uo pipefail
+
+if [ -z "${HOME:-}" ]; then
+  echo "ERROR: \$HOME is not set" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LEGACY_BUILD_DIR="$REPO_ROOT/.build"
+KSTACK_CONFIG_DIR="$HOME/.config/kstack"
+
+KNOWN_AGENTS="claude codex opencode cursor factory slate kiro hermes"
+
+agent_skills_dir_global() {
+  case "$1" in
+    claude)   echo "$HOME/.claude/skills" ;;
+    codex)    echo "$HOME/.codex/skills" ;;
+    opencode) echo "$HOME/.config/opencode/skills" ;;
+    cursor)   echo "$HOME/.cursor/skills" ;;
+    factory)  echo "$HOME/.factory/skills" ;;
+    slate)    echo "$HOME/.slate/skills" ;;
+    kiro)     echo "$HOME/.kiro/skills" ;;
+    hermes)   echo "$HOME/.hermes/skills" ;;
+    *)        return 1 ;;
+  esac
+}
+
+agent_skills_dir_local() {
+  case "$1" in
+    claude)   echo "$REPO_ROOT/.claude/skills" ;;
+    codex)    echo "$REPO_ROOT/.codex/skills" ;;
+    opencode) echo "$REPO_ROOT/.config/opencode/skills" ;;
+    cursor)   echo "$REPO_ROOT/.cursor/skills" ;;
+    factory)  echo "$REPO_ROOT/.factory/skills" ;;
+    slate)    echo "$REPO_ROOT/.slate/skills" ;;
+    kiro)     echo "$REPO_ROOT/.kiro/skills" ;;
+    hermes)   echo "$REPO_ROOT/.hermes/skills" ;;
+    *)        return 1 ;;
+  esac
+}
+
+is_known_agent() {
+  case " $KNOWN_AGENTS " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
+# ─── Flags ────────────────────────────────────────────────────
+FORCE=0
+AGENT=""
+SCOPE_GLOBAL=1
+SCOPE_LOCAL=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --force) FORCE=1; shift ;;
+    --agent)
+      [ -z "${2:-}" ] && { echo "Missing value for --agent" >&2; exit 1; }
+      AGENT="$2"; shift 2 ;;
+    --agent=*) AGENT="${1#--agent=}"; shift ;;
+    --global) SCOPE_LOCAL=0; shift ;;
+    --local)  SCOPE_GLOBAL=0; shift ;;
+    -h|--help)
+      sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
+      exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+# ─── Determine which agents to scan ────────────────────────────
+TARGET_AGENTS=""
+if [ -z "$AGENT" ]; then
+  TARGET_AGENTS="$KNOWN_AGENTS"
+else
+  if ! is_known_agent "$AGENT"; then
+    echo "Unknown agent: $AGENT" >&2
+    echo "Supported: $KNOWN_AGENTS" >&2
+    exit 1
+  fi
+  TARGET_AGENTS="$AGENT"
+fi
+
+# ─── Preview + confirm ────────────────────────────────────────
+PREVIEW=""
+
+if [ "$SCOPE_GLOBAL" -eq 1 ]; then
+  for h in $TARGET_AGENTS; do
+    skills_dir="$(agent_skills_dir_global "$h")"
+    [ -d "$skills_dir" ] || continue
+    for entry in "$skills_dir"/kstack-*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      PREVIEW="$PREVIEW  $entry
+"
+    done
+  done
+  [ -d "$KSTACK_CONFIG_DIR" ] && PREVIEW="$PREVIEW  $KSTACK_CONFIG_DIR/
+"
+fi
+
+if [ "$SCOPE_LOCAL" -eq 1 ]; then
+  for h in $TARGET_AGENTS; do
+    skills_dir="$(agent_skills_dir_local "$h")"
+    [ -d "$skills_dir" ] || continue
+    for entry in "$skills_dir"/*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      case "$(basename "$entry")" in .gitkeep) continue ;; esac
+      PREVIEW="$PREVIEW  $entry
+"
+    done
+  done
+fi
+
+# Legacy cleanup — always in scope.
+[ -d "$LEGACY_BUILD_DIR" ] && PREVIEW="$PREVIEW  $LEGACY_BUILD_DIR/  (legacy)
+"
+
+if [ -z "$PREVIEW" ]; then
+  echo "Nothing to remove — kstack is not installed."
+  exit 0
+fi
+
+if [ "$FORCE" -eq 0 ]; then
+  echo "This will remove:"
+  printf '%s' "$PREVIEW"
+  printf "\nContinue? [y/N] "
+  read -r REPLY
+  case "$REPLY" in
+    y|Y|yes|YES) ;;
+    *) echo "Aborted."; exit 0 ;;
+  esac
+fi
+
+# ─── Remove ───────────────────────────────────────────────────
+REMOVED=""
+
+if [ "$SCOPE_GLOBAL" -eq 1 ]; then
+  for h in $TARGET_AGENTS; do
+    skills_dir="$(agent_skills_dir_global "$h")"
+    [ -d "$skills_dir" ] || continue
+    for entry in "$skills_dir"/kstack-*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      rm -rf "$entry"
+      REMOVED="$REMOVED $h/$(basename "$entry")"
+    done
+  done
+  if [ -d "$KSTACK_CONFIG_DIR" ]; then
+    rm -rf "$KSTACK_CONFIG_DIR"
+    REMOVED="$REMOVED ~/.config/kstack/"
+  fi
+fi
+
+if [ "$SCOPE_LOCAL" -eq 1 ]; then
+  for h in $TARGET_AGENTS; do
+    skills_dir="$(agent_skills_dir_local "$h")"
+    [ -d "$skills_dir" ] || continue
+    for entry in "$skills_dir"/*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      case "$(basename "$entry")" in .gitkeep) continue ;; esac
+      rm -rf "$entry"
+      REMOVED="$REMOVED local/$h/$(basename "$entry")"
+    done
+  done
+fi
+
+if [ -d "$LEGACY_BUILD_DIR" ]; then
+  rm -rf "$LEGACY_BUILD_DIR"
+  REMOVED="$REMOVED .build/"
+fi
+
+if [ -n "$REMOVED" ]; then
+  echo "Removed:$REMOVED"
+  echo "kstack uninstalled."
+else
+  echo "Nothing to remove."
+fi
+
+exit 0
