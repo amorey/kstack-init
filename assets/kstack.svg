@@ -1,72 +1,54 @@
-<svg width="651" height="1021" viewBox="0 0 651 1021" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_19_117)">
-<mask id="mask0_19_117" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-13" y="25" width="767" height="122">
-<path d="M753.118 25.5254H-12.7647V146.769H753.118V25.5254Z" fill="white"/>
-</mask>
-<g mask="url(#mask0_19_117)">
-<path d="M22.9765 35.7354H214.447V999.304H22.9765V35.7354Z" fill="#B8B8B8"/>
-<path d="M214.447 290.985L405.918 35.7354H622.918L303.8 479.87V555.169L622.918 999.304H405.918L214.447 744.054V290.985Z" fill="#B8B8B8"/>
-<path d="M12.7647 25.5254H204.235V989.094H12.7647V25.5254Z" fill="#E8E8E8" stroke="#222222" stroke-width="3"/>
-<path d="M204.235 280.775L395.706 25.5254H612.706L293.588 469.66V544.959L612.706 989.094H395.706L204.235 733.844V280.775Z" fill="#E8E8E8" stroke="#222222" stroke-width="3"/>
-</g>
-<mask id="mask1_19_117" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-13" y="165" width="767" height="123">
-<path d="M753.118 165.913H-12.7647V287.157H753.118V165.913Z" fill="white"/>
-</mask>
-<g mask="url(#mask1_19_117)">
-<path d="M28.0823 40.8408H219.553V1004.41H28.0823V40.8408Z" fill="#9A9A9A"/>
-<path d="M219.553 296.091L411.024 40.8408H628.024L308.906 484.976V560.275L628.024 1004.41H411.024L219.553 749.16V296.091Z" fill="#9A9A9A"/>
-<path d="M12.7647 25.5254H204.235V989.094H12.7647V25.5254Z" fill="#CCCCCC" stroke="#222222" stroke-width="3"/>
-<path d="M204.235 280.775L395.706 25.5254H612.706L293.588 469.66V544.959L612.706 989.094H395.706L204.235 733.844V280.775Z" fill="#CCCCCC" stroke="#222222" stroke-width="3"/>
-</g>
-<mask id="mask2_19_117" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-13" y="306" width="767" height="122">
-<path d="M753.118 306.301H-12.7647V427.545H753.118V306.301Z" fill="white"/>
-</mask>
-<g mask="url(#mask2_19_117)">
-<path d="M33.1882 45.9453H224.659V1009.51H33.1882V45.9453Z" fill="#707070"/>
-<path d="M224.659 301.195L416.129 45.9453H633.129L314.012 490.08V565.379L633.129 1009.51H416.129L224.659 754.264V301.195Z" fill="#707070"/>
-<path d="M12.7647 25.5254H204.235V989.094H12.7647V25.5254Z" fill="#A8A8A8" stroke="#222222" stroke-width="3"/>
-<path d="M204.235 280.775L395.706 25.5254H612.706L293.588 469.66V544.959L612.706 989.094H395.706L204.235 733.844V280.775Z" fill="#A8A8A8" stroke="#222222" stroke-width="3"/>
-</g>
-<mask id="mask3_19_117" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-13" y="446" width="767" height="122">
-<path d="M753.118 446.688H-12.7647V567.931H753.118V446.688Z" fill="white"/>
-</mask>
-<g mask="url(#mask3_19_117)">
-<path d="M38.2941 51.0508H229.765V1014.62H38.2941V51.0508Z" fill="#484848"/>
-<path d="M229.765 306.301L421.235 51.0508H638.235L319.118 495.186V570.485L638.235 1014.62H421.235L229.765 759.37V306.301Z" fill="#484848"/>
-<path d="M12.7647 25.5254H204.235V989.094H12.7647V25.5254Z" fill="#808080" stroke="#222222" stroke-width="3"/>
-<path d="M204.235 280.775L395.706 25.5254H612.706L293.588 469.66V544.959L612.706 989.094H395.706L204.235 733.844V280.775Z" fill="#808080" stroke="#222222" stroke-width="3"/>
-</g>
-<mask id="mask4_19_117" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-13" y="587" width="767" height="122">
-<path d="M753.118 587.076H-12.7647V708.32H753.118V587.076Z" fill="white"/>
-</mask>
-<g mask="url(#mask4_19_117)">
-<path d="M33.1882 45.9463H224.659V1009.52H33.1882V45.9463Z" fill="#303030"/>
-<path d="M224.659 301.196L416.129 45.9463H633.129L314.012 490.081V565.38L633.129 1009.52H416.129L224.659 754.265V301.196Z" fill="#303030"/>
-<path d="M12.7647 25.5264H204.235V989.095H12.7647V25.5264Z" fill="#585858" stroke="#222222" stroke-width="3"/>
-<path d="M204.235 280.776L395.706 25.5264H612.706L293.588 469.661V544.96L612.706 989.095H395.706L204.235 733.845V280.776Z" fill="#585858" stroke="#222222" stroke-width="3"/>
-</g>
-<mask id="mask5_19_117" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-13" y="727" width="767" height="122">
-<path d="M753.118 727.463H-12.7647V848.707H753.118V727.463Z" fill="white"/>
-</mask>
-<g mask="url(#mask5_19_117)">
-<path d="M28.0823 40.8408H219.553V1004.41H28.0823V40.8408Z" fill="#1A1A1A"/>
-<path d="M219.553 296.091L411.024 40.8408H628.024L308.906 484.976V560.275L628.024 1004.41H411.024L219.553 749.16V296.091Z" fill="#1A1A1A"/>
-<path d="M12.7647 25.5254H204.235V989.094H12.7647V25.5254Z" fill="#383838" stroke="#111111" stroke-width="3"/>
-<path d="M204.235 280.775L395.706 25.5254H612.706L293.588 469.66V544.959L612.706 989.094H395.706L204.235 733.844V280.775Z" fill="#383838" stroke="#111111" stroke-width="3"/>
-</g>
-<mask id="mask6_19_117" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="-13" y="867" width="767" height="123">
-<path d="M753.118 867.85H-12.7647V989.093H753.118V867.85Z" fill="white"/>
-</mask>
-<g mask="url(#mask6_19_117)">
-<path d="M22.9765 35.7344H214.447V999.303H22.9765V35.7344Z" fill="#080808"/>
-<path d="M214.447 290.984L405.918 35.7344H622.918L303.8 479.869V555.168L622.918 999.303H405.918L214.447 744.053V290.984Z" fill="#080808"/>
-<path d="M12.7647 25.5244H204.235V989.093H12.7647V25.5244Z" fill="#1A1A1A" stroke="black" stroke-width="3"/>
-<path d="M204.235 280.774L395.706 25.5244H612.706L293.588 469.659V544.958L612.706 989.093H395.706L204.235 733.843V280.774Z" fill="#1A1A1A" stroke="black" stroke-width="3"/>
-</g>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6466 1796">
 <defs>
-<clipPath id="clip0_19_117">
-<rect width="651" height="1021" fill="white"/>
-</clipPath>
+<g id="kstack-glyphs">
+<path d="M100 0V-1540H416V-653H444L784 -1077H1157L715 -561L1180 0H807L441 -460H416V0Z" transform="translate(0,0)"/>
+<path d="M472 16Q376 16 288.0 -17.0Q200 -50 133.5 -110.5Q67 -171 33 -252L281 -361Q306 -315 356.0 -272.5Q406 -230 474 -230Q527 -230 561.0 -257.0Q595 -284 595 -318Q595 -357 555.5 -381.5Q516 -406 462.5 -421.5Q409 -437 365 -450Q289 -473 221.5 -513.5Q154 -554 112.0 -617.0Q70 -680 70 -770Q70 -865 119.0 -937.5Q168 -1010 254.0 -1051.0Q340 -1092 450 -1092Q587 -1092 696.5 -1029.0Q806 -966 852 -862L609 -757Q590 -789 553.5 -819.0Q517 -849 461 -849Q414 -849 383.0 -825.0Q352 -801 352 -765Q352 -729 383.0 -706.5Q414 -684 462.0 -669.0Q510 -654 562 -638Q602 -627 655.0 -606.5Q708 -586 758.5 -551.0Q809 -516 842.5 -461.0Q876 -406 876 -326Q876 -225 821.0 -148.0Q766 -71 674.0 -27.5Q582 16 472 16Z" transform="translate(1174,0)"/>
+<path d="M593 16Q394 16 297.0 -94.5Q200 -205 200 -378V-814H20V-1076H200V-1386H516V-1076H765V-814H516V-386Q516 -317 549.5 -286.5Q583 -256 632 -256Q655 -256 677.0 -262.0Q699 -268 716 -277L818 -28Q773 -6 713.5 5.0Q654 16 593 16Z" transform="translate(2091,0)"/>
+<path d="M418 16Q308 16 225.5 -28.0Q143 -72 97.0 -146.5Q51 -221 51 -312Q51 -457 167.5 -551.0Q284 -645 495 -645H698V-699Q698 -762 651.5 -799.0Q605 -836 521 -836Q449 -836 364.5 -812.5Q280 -789 224 -754L119 -992Q179 -1027 295.0 -1059.5Q411 -1092 556 -1092Q707 -1092 796.0 -1054.0Q885 -1016 928.5 -956.0Q972 -896 985.0 -829.0Q998 -762 998 -703V-379Q998 -324 1011.5 -295.5Q1025 -267 1060 -256L1084 -248L973 16L936 4Q866 -19 822.0 -52.5Q778 -86 758 -123H754Q712 -66 621.5 -25.0Q531 16 418 16ZM498 -221Q536 -221 586.5 -236.0Q637 -251 675.0 -286.0Q713 -321 713 -380V-447H533Q356 -447 356 -332Q356 -280 396.0 -250.5Q436 -221 498 -221Z" transform="translate(2924,0)"/>
+<path d="M628 12Q468 12 336.5 -61.5Q205 -135 127.0 -260.5Q49 -386 49 -542Q49 -658 93.0 -758.0Q137 -858 215.5 -933.0Q294 -1008 397.0 -1050.0Q500 -1092 617 -1092Q708 -1092 794.5 -1065.5Q881 -1039 950 -993L834 -739Q793 -777 740.0 -798.0Q687 -819 625 -819Q496 -819 423.0 -737.0Q350 -655 350 -543Q350 -464 385.5 -400.0Q421 -336 482.5 -298.5Q544 -261 623 -261Q689 -261 749.0 -284.0Q809 -307 838 -334L951 -75Q894 -40 810.0 -14.0Q726 12 628 12Z" transform="translate(4056,0)"/>
+<path d="M100 0V-1540H416V-653H444L784 -1077H1157L715 -561L1180 0H807L441 -460H416V0Z" transform="translate(5032,0)"/>
+</g>
+<mask id="b0" maskUnits="userSpaceOnUse"><rect x="0" y="100.0" width="6466" height="196.0" fill="white"/></mask>
+<mask id="b1" maskUnits="userSpaceOnUse"><rect x="0" y="326.7" width="6466" height="196.0" fill="white"/></mask>
+<mask id="b2" maskUnits="userSpaceOnUse"><rect x="0" y="553.3" width="6466" height="196.0" fill="white"/></mask>
+<mask id="b3" maskUnits="userSpaceOnUse"><rect x="0" y="780.0" width="6466" height="196.0" fill="white"/></mask>
+<mask id="b4" maskUnits="userSpaceOnUse"><rect x="0" y="1006.6" width="6466" height="196.0" fill="white"/></mask>
+<mask id="b5" maskUnits="userSpaceOnUse"><rect x="0" y="1233.3" width="6466" height="196.0" fill="white"/></mask>
+<mask id="b6" maskUnits="userSpaceOnUse"><rect x="0" y="1460.0" width="6466" height="196.0" fill="white"/></mask>
 </defs>
+<g mask="url(#b0)">
+<use href="#kstack-glyphs" transform="translate(96.0,1656.0)" fill="#B8B8B8" stroke="#B8B8B8" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#222222" stroke="#222222" stroke-width="120" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#E8E8E8" stroke="#E8E8E8" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+</g>
+<g mask="url(#b1)">
+<use href="#kstack-glyphs" transform="translate(104.0,1664.0)" fill="#9A9A9A" stroke="#9A9A9A" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#222222" stroke="#222222" stroke-width="120" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#CCCCCC" stroke="#CCCCCC" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+</g>
+<g mask="url(#b2)">
+<use href="#kstack-glyphs" transform="translate(112.0,1672.0)" fill="#707070" stroke="#707070" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#222222" stroke="#222222" stroke-width="120" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#A8A8A8" stroke="#A8A8A8" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+</g>
+<g mask="url(#b3)">
+<use href="#kstack-glyphs" transform="translate(120.0,1680.0)" fill="#484848" stroke="#484848" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#222222" stroke="#222222" stroke-width="120" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#808080" stroke="#808080" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+</g>
+<g mask="url(#b4)">
+<use href="#kstack-glyphs" transform="translate(112.0,1672.0)" fill="#303030" stroke="#303030" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#222222" stroke="#222222" stroke-width="120" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#585858" stroke="#585858" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+</g>
+<g mask="url(#b5)">
+<use href="#kstack-glyphs" transform="translate(104.0,1664.0)" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#111111" stroke="#111111" stroke-width="120" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#383838" stroke="#383838" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+</g>
+<g mask="url(#b6)">
+<use href="#kstack-glyphs" transform="translate(96.0,1656.0)" fill="#080808" stroke="#080808" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#000000" stroke="#000000" stroke-width="120" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+<use href="#kstack-glyphs" transform="translate(80.0,1640.0)" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="90" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="butt"/>
+</g>
 </svg>
