@@ -107,91 +107,91 @@ Each skill is invoked with `/<name>` inside a Claude Code session. All skills ar
 ### Monitoring
 
 #### `/cluster-status`
-Health snapshot across the whole cluster.
-
-**What it checks:** pod phase distribution, restart counts, node `Ready`/`MemoryPressure`/`DiskPressure`/`PIDPressure` conditions, unschedulable pods, workload replica drift (desired vs. ready), and PDB violations.
-
-**How it works:** a single fan-out of `kubectl get` calls with server-side field selectors, aggregated client-side. Summarization is delta-aware — on repeat runs, Claude highlights what changed rather than reprinting the full snapshot.
-
-**Options:**
-- `--since <duration>` — only flag issues that appeared in the last N minutes (e.g. `--since 15m`)
-- `--severity <level>` — filter output to `critical`, `warning`, or `info`
+> Health snapshot across the whole cluster.
+>
+> **What it checks:** pod phase distribution, restart counts, node `Ready`/`MemoryPressure`/`DiskPressure`/`PIDPressure` conditions, unschedulable pods, workload replica drift (desired vs. ready), and PDB violations.
+>
+> **How it works:** a single fan-out of `kubectl get` calls with server-side field selectors, aggregated client-side. Summarization is delta-aware — on repeat runs, Claude highlights what changed rather than reprinting the full snapshot.
+>
+> **Options:**
+> - `--since <duration>` — only flag issues that appeared in the last N minutes (e.g. `--since 15m`)
+> - `--severity <level>` — filter output to `critical`, `warning`, or `info`
 
 #### `/events`
-Recent cluster events, ranked by severity and deduplicated.
-
-**What it checks:** `Warning` and `Normal` events from the Events API, grouped by `(reason, involvedObject.kind, namespace)` with occurrence counts. Noisy reasons (`Pulled`, `Created`, `Started`) are collapsed.
-
-**How it works:** pulls from the `events.k8s.io/v1` API with server-side sorting by `lastTimestamp`. For clusters with an events exporter (e.g. kubernetes-event-exporter, Loki), `/events` detects and queries the backend instead of the short-lived in-cluster store.
-
-**Options:**
-- `--since <duration>` — window size (default `1h`)
-- `--reason <regex>` — restrict to matching reasons
-- `--object <kind/name>` — narrow to a single resource's event stream
+> Recent cluster events, ranked by severity and deduplicated.
+>
+> **What it checks:** `Warning` and `Normal` events from the Events API, grouped by `(reason, involvedObject.kind, namespace)` with occurrence counts. Noisy reasons (`Pulled`, `Created`, `Started`) are collapsed.
+>
+> **How it works:** pulls from the `events.k8s.io/v1` API with server-side sorting by `lastTimestamp`. For clusters with an events exporter (e.g. kubernetes-event-exporter, Loki), `/events` detects and queries the backend instead of the short-lived in-cluster store.
+>
+> **Options:**
+> - `--since <duration>` — window size (default `1h`)
+> - `--reason <regex>` — restrict to matching reasons
+> - `--object <kind/name>` — narrow to a single resource's event stream
 
 #### `/watch <resource>`
-Long-running background watcher that pings Claude only when state changes.
-
-**What it does:** starts a detached watcher (shell loop + filter script) that streams `kubectl get --watch` for the target resource. The filter compares each update to the previous state hash and only notifies Claude on meaningful changes: phase transitions, restart count increments, replica drift, new `Warning` events, node condition flips.
-
-**Why it's cheap:** while the resource stays healthy, the model isn't in the loop — idle token cost is effectively zero. Claude only enters the conversation when the filter fires.
-
-**Arguments:**
-- `<resource>` — any of `pod/<name>`, `deployment/<name>`, `node/<name>`, `namespace/<ns>`, or `cluster` for cluster-wide
-
-**Options:**
-- `--for <duration>` — auto-stop after N (default: until user cancels)
-- `--threshold <level>` — minimum severity to ping on (default `warning`)
-- `--quiet` — suppress heartbeat pings; only notify on anomalies
-- `--list` / `--stop <id>` — manage active watchers
+> Long-running background watcher that pings Claude only when state changes.
+>
+> **What it does:** starts a detached watcher (shell loop + filter script) that streams `kubectl get --watch` for the target resource. The filter compares each update to the previous state hash and only notifies Claude on meaningful changes: phase transitions, restart count increments, replica drift, new `Warning` events, node condition flips.
+>
+> **Why it's cheap:** while the resource stays healthy, the model isn't in the loop — idle token cost is effectively zero. Claude only enters the conversation when the filter fires.
+>
+> **Arguments:**
+> - `<resource>` — any of `pod/<name>`, `deployment/<name>`, `node/<name>`, `namespace/<ns>`, or `cluster` for cluster-wide
+>
+> **Options:**
+> - `--for <duration>` — auto-stop after N (default: until user cancels)
+> - `--threshold <level>` — minimum severity to ping on (default `warning`)
+> - `--quiet` — suppress heartbeat pings; only notify on anomalies
+> - `--list` / `--stop <id>` — manage active watchers
 
 ---
 
 ### Troubleshooting
 
 #### `/investigate <resource>`
-Root-cause analysis for a failing or suspicious resource.
-
-**What it does:** gathers the resource spec, current + previous container statuses, recent events for the object and its owners, logs from failed/previous containers, related resources (ConfigMaps, Secrets, PVCs, Services, NetworkPolicies), and the last N changes from the revision history. Correlates signals into a ranked list of likely causes.
-
-**Special cases:** for pods in `Pending`, `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, or `Error` states, the skill jumps straight to the state-specific diagnostic path (node capacity + taints for Pending, prior-instance logs for CrashLoop, memory limits + workingset for OOM, image registry auth for ImagePull).
-
-**Arguments:**
-- `<resource>` — `<kind>/<name>` (e.g. `pod/api-7d9`, `deployment/web`, `ingress/public`)
-
-**Options:**
-- `--depth <n>` — how many hops of related resources to follow (default `2`)
-- `--since <duration>` — log/event lookback window (default `1h`)
-- `--compare <revision>` — diff current state against a prior revision
+> Root-cause analysis for a failing or suspicious resource.
+>
+> **What it does:** gathers the resource spec, current + previous container statuses, recent events for the object and its owners, logs from failed/previous containers, related resources (ConfigMaps, Secrets, PVCs, Services, NetworkPolicies), and the last N changes from the revision history. Correlates signals into a ranked list of likely causes.
+>
+> **Special cases:** for pods in `Pending`, `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, or `Error` states, the skill jumps straight to the state-specific diagnostic path (node capacity + taints for Pending, prior-instance logs for CrashLoop, memory limits + workingset for OOM, image registry auth for ImagePull).
+>
+> **Arguments:**
+> - `<resource>` — `<kind>/<name>` (e.g. `pod/api-7d9`, `deployment/web`, `ingress/public`)
+>
+> **Options:**
+> - `--depth <n>` — how many hops of related resources to follow (default `2`)
+> - `--since <duration>` — log/event lookback window (default `1h`)
+> - `--compare <revision>` — diff current state against a prior revision
 
 #### `/exec <pod>`
-Guided shell into a pod's container with diagnostics pre-loaded.
-
-**What it does:** opens an interactive `kubectl exec` session. Before handing you the prompt, Claude runs a lightweight probe (`ls /bin/sh`, env dump, DNS resolution of in-cluster services) and reports what's available. A history of common diagnostics (`nslookup`, `curl` to service endpoints, `env | grep`, `cat /proc/1/status`) is primed so you can recall with arrow-up.
-
-**Scratch/distroless fallback:** if the target container has no shell, kstack transparently switches to `kubectl debug --target=<container> --image=<toolbox>` (default toolbox: `nicolaka/netshoot` for network issues, `busybox` otherwise). The debug container shares the target's PID namespace, so `/proc/1/root` gives you the scratch container's filesystem.
-
-**Arguments:**
-- `<pod>` — pod name, optionally `<pod>/<container>`
-
-**Options:**
-- `--toolbox <image>` — override the debug container image
-- `--copy-to <name>` — clone the pod (useful when the original is crashlooping)
-- `--node` — drop to a shell on the pod's *node* instead of the container
+> Guided shell into a pod's container with diagnostics pre-loaded.
+>
+> **What it does:** opens an interactive `kubectl exec` session. Before handing you the prompt, Claude runs a lightweight probe (`ls /bin/sh`, env dump, DNS resolution of in-cluster services) and reports what's available. A history of common diagnostics (`nslookup`, `curl` to service endpoints, `env | grep`, `cat /proc/1/status`) is primed so you can recall with arrow-up.
+>
+> **Scratch/distroless fallback:** if the target container has no shell, kstack transparently switches to `kubectl debug --target=<container> --image=<toolbox>` (default toolbox: `nicolaka/netshoot` for network issues, `busybox` otherwise). The debug container shares the target's PID namespace, so `/proc/1/root` gives you the scratch container's filesystem.
+>
+> **Arguments:**
+> - `<pod>` — pod name, optionally `<pod>/<container>`
+>
+> **Options:**
+> - `--toolbox <image>` — override the debug container image
+> - `--copy-to <name>` — clone the pod (useful when the original is crashlooping)
+> - `--node` — drop to a shell on the pod's *node* instead of the container
 
 #### `/logs`
-Fetch and filter container logs with kubetail's node-side grep.
-
-**Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to Claude. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs the regex filter on the node where the log lives and only sends matching lines back. Typical 100x reduction in transferred data.
-
-**Arguments (all optional, composable):**
-- `--selector <label>` — label selector across pods (e.g. `app=api`)
-- `--pod <name>` / `--container <name>` — narrow scope
-- `--grep <regex>` — node-side filter (required for large log volumes)
-- `--since <duration>` — lookback window (default `15m`)
-- `--tail <n>` — last N lines
-- `--follow` — stream new matches as they arrive
-- `--level <level>` — shorthand for common log-level regexes (`error`, `warn`, `info`)
+> Fetch and filter container logs with kubetail's node-side grep.
+>
+> **Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to Claude. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs the regex filter on the node where the log lives and only sends matching lines back. Typical 100x reduction in transferred data.
+>
+> **Arguments (all optional, composable):**
+> - `--selector <label>` — label selector across pods (e.g. `app=api`)
+> - `--pod <name>` / `--container <name>` — narrow scope
+> - `--grep <regex>` — node-side filter (required for large log volumes)
+> - `--since <duration>` — lookback window (default `15m`)
+> - `--tail <n>` — last N lines
+> - `--follow` — stream new matches as they arrive
+> - `--level <level>` — shorthand for common log-level regexes (`error`, `warn`, `info`)
 
 ---
 
