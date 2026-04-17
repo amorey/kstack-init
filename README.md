@@ -106,92 +106,119 @@ Each skill is invoked with `/<name>` inside a Claude Code session. All skills ar
 
 ### Monitoring
 
-#### `/cluster-status`
-> Health snapshot across the whole cluster.
->
-> **What it checks:** pod phase distribution, restart counts, node `Ready`/`MemoryPressure`/`DiskPressure`/`PIDPressure` conditions, unschedulable pods, workload replica drift (desired vs. ready), and PDB violations.
->
-> **How it works:** a single fan-out of `kubectl get` calls with server-side field selectors, aggregated client-side. Summarization is delta-aware — on repeat runs, Claude highlights what changed rather than reprinting the full snapshot.
->
-> **Options:**
-> - `--since <duration>` — only flag issues that appeared in the last N minutes (e.g. `--since 15m`)
-> - `--severity <level>` — filter output to `critical`, `warning`, or `info`
+- #### `/cluster-status`
 
-#### `/events`
-> Recent cluster events, ranked by severity and deduplicated.
->
-> **What it checks:** `Warning` and `Normal` events from the Events API, grouped by `(reason, involvedObject.kind, namespace)` with occurrence counts. Noisy reasons (`Pulled`, `Created`, `Started`) are collapsed.
->
-> **How it works:** pulls from the `events.k8s.io/v1` API with server-side sorting by `lastTimestamp`. For clusters with an events exporter (e.g. kubernetes-event-exporter, Loki), `/events` detects and queries the backend instead of the short-lived in-cluster store.
->
-> **Options:**
-> - `--since <duration>` — window size (default `1h`)
-> - `--reason <regex>` — restrict to matching reasons
-> - `--object <kind/name>` — narrow to a single resource's event stream
+  Health snapshot across the whole cluster.
 
-#### `/watch <resource>`
-> Long-running background watcher that pings Claude only when state changes.
->
-> **What it does:** starts a detached watcher (shell loop + filter script) that streams `kubectl get --watch` for the target resource. The filter compares each update to the previous state hash and only notifies Claude on meaningful changes: phase transitions, restart count increments, replica drift, new `Warning` events, node condition flips.
->
-> **Why it's cheap:** while the resource stays healthy, the model isn't in the loop — idle token cost is effectively zero. Claude only enters the conversation when the filter fires.
->
-> **Arguments:**
-> - `<resource>` — any of `pod/<name>`, `deployment/<name>`, `node/<name>`, `namespace/<ns>`, or `cluster` for cluster-wide
->
-> **Options:**
-> - `--for <duration>` — auto-stop after N (default: until user cancels)
-> - `--threshold <level>` — minimum severity to ping on (default `warning`)
-> - `--quiet` — suppress heartbeat pings; only notify on anomalies
-> - `--list` / `--stop <id>` — manage active watchers
+  **What it checks:** pod phase distribution, restart counts, node `Ready`/`MemoryPressure`/`DiskPressure`/`PIDPressure` conditions, unschedulable pods, workload replica drift (desired vs. ready), and PDB violations.
+
+  **How it works:** a single fan-out of `kubectl get` calls with server-side field selectors, aggregated client-side. Summarization is delta-aware — on repeat runs, Claude highlights what changed rather than reprinting the full snapshot.
+
+  **Options:**
+  - `--since <duration>` — only flag issues that appeared in the last N minutes (e.g. `--since 15m`)
+  - `--severity <level>` — filter output to `critical`, `warning`, or `info`
+
+- #### `/events`
+
+  Recent cluster events, ranked by severity and deduplicated.
+
+  **What it checks:** `Warning` and `Normal` events from the Events API, grouped by `(reason, involvedObject.kind, namespace)` with occurrence counts. Noisy reasons (`Pulled`, `Created`, `Started`) are collapsed.
+
+  **How it works:** pulls from the `events.k8s.io/v1` API with server-side sorting by `lastTimestamp`. For clusters with an events exporter (e.g. kubernetes-event-exporter, Loki), `/events` detects and queries the backend instead of the short-lived in-cluster store.
+
+  **Options:**
+  - `--since <duration>` — window size (default `1h`)
+  - `--reason <regex>` — restrict to matching reasons
+  - `--object <kind/name>` — narrow to a single resource's event stream
+
+- #### `/watch <resource>`
+
+  Long-running background watcher that pings Claude only when state changes.
+
+  **What it does:** starts a detached watcher (shell loop + filter script) that streams `kubectl get --watch` for the target resource. The filter compares each update to the previous state hash and only notifies Claude on meaningful changes: phase transitions, restart count increments, replica drift, new `Warning` events, node condition flips.
+
+  **Why it's cheap:** while the resource stays healthy, the model isn't in the loop — idle token cost is effectively zero. Claude only enters the conversation when the filter fires.
+
+  **Arguments:**
+  - `<resource>` — any of `pod/<name>`, `deployment/<name>`, `node/<name>`, `namespace/<ns>`, or `cluster` for cluster-wide
+
+  **Options:**
+  - `--for <duration>` — auto-stop after N (default: until user cancels)
+  - `--threshold <level>` — minimum severity to ping on (default `warning`)
+  - `--quiet` — suppress heartbeat pings; only notify on anomalies
+  - `--list` / `--stop <id>` — manage active watchers
 
 ---
 
 ### Troubleshooting
 
+<dl>
+<dt>
+
 #### `/investigate <resource>`
-> Root-cause analysis for a failing or suspicious resource.
->
-> **What it does:** gathers the resource spec, current + previous container statuses, recent events for the object and its owners, logs from failed/previous containers, related resources (ConfigMaps, Secrets, PVCs, Services, NetworkPolicies), and the last N changes from the revision history. Correlates signals into a ranked list of likely causes.
->
-> **Special cases:** for pods in `Pending`, `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, or `Error` states, the skill jumps straight to the state-specific diagnostic path (node capacity + taints for Pending, prior-instance logs for CrashLoop, memory limits + workingset for OOM, image registry auth for ImagePull).
->
-> **Arguments:**
-> - `<resource>` — `<kind>/<name>` (e.g. `pod/api-7d9`, `deployment/web`, `ingress/public`)
->
-> **Options:**
-> - `--depth <n>` — how many hops of related resources to follow (default `2`)
-> - `--since <duration>` — log/event lookback window (default `1h`)
-> - `--compare <revision>` — diff current state against a prior revision
+
+</dt>
+<dd>
+
+Root-cause analysis for a failing or suspicious resource.
+
+**What it does:** gathers the resource spec, current + previous container statuses, recent events for the object and its owners, logs from failed/previous containers, related resources (ConfigMaps, Secrets, PVCs, Services, NetworkPolicies), and the last N changes from the revision history. Correlates signals into a ranked list of likely causes.
+
+**Special cases:** for pods in `Pending`, `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, or `Error` states, the skill jumps straight to the state-specific diagnostic path (node capacity + taints for Pending, prior-instance logs for CrashLoop, memory limits + workingset for OOM, image registry auth for ImagePull).
+
+**Arguments:**
+- `<resource>` — `<kind>/<name>` (e.g. `pod/api-7d9`, `deployment/web`, `ingress/public`)
+
+**Options:**
+- `--depth <n>` — how many hops of related resources to follow (default `2`)
+- `--since <duration>` — log/event lookback window (default `1h`)
+- `--compare <revision>` — diff current state against a prior revision
+
+</dd>
+<dt>
 
 #### `/exec <pod>`
-> Guided shell into a pod's container with diagnostics pre-loaded.
->
-> **What it does:** opens an interactive `kubectl exec` session. Before handing you the prompt, Claude runs a lightweight probe (`ls /bin/sh`, env dump, DNS resolution of in-cluster services) and reports what's available. A history of common diagnostics (`nslookup`, `curl` to service endpoints, `env | grep`, `cat /proc/1/status`) is primed so you can recall with arrow-up.
->
-> **Scratch/distroless fallback:** if the target container has no shell, kstack transparently switches to `kubectl debug --target=<container> --image=<toolbox>` (default toolbox: `nicolaka/netshoot` for network issues, `busybox` otherwise). The debug container shares the target's PID namespace, so `/proc/1/root` gives you the scratch container's filesystem.
->
-> **Arguments:**
-> - `<pod>` — pod name, optionally `<pod>/<container>`
->
-> **Options:**
-> - `--toolbox <image>` — override the debug container image
-> - `--copy-to <name>` — clone the pod (useful when the original is crashlooping)
-> - `--node` — drop to a shell on the pod's *node* instead of the container
+
+</dt>
+<dd>
+
+Guided shell into a pod's container with diagnostics pre-loaded.
+
+**What it does:** opens an interactive `kubectl exec` session. Before handing you the prompt, Claude runs a lightweight probe (`ls /bin/sh`, env dump, DNS resolution of in-cluster services) and reports what's available. A history of common diagnostics (`nslookup`, `curl` to service endpoints, `env | grep`, `cat /proc/1/status`) is primed so you can recall with arrow-up.
+
+**Scratch/distroless fallback:** if the target container has no shell, kstack transparently switches to `kubectl debug --target=<container> --image=<toolbox>` (default toolbox: `nicolaka/netshoot` for network issues, `busybox` otherwise). The debug container shares the target's PID namespace, so `/proc/1/root` gives you the scratch container's filesystem.
+
+**Arguments:**
+- `<pod>` — pod name, optionally `<pod>/<container>`
+
+**Options:**
+- `--toolbox <image>` — override the debug container image
+- `--copy-to <name>` — clone the pod (useful when the original is crashlooping)
+- `--node` — drop to a shell on the pod's *node* instead of the container
+
+</dd>
+<dt>
 
 #### `/logs`
-> Fetch and filter container logs with kubetail's node-side grep.
->
-> **Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to Claude. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs the regex filter on the node where the log lives and only sends matching lines back. Typical 100x reduction in transferred data.
->
-> **Arguments (all optional, composable):**
-> - `--selector <label>` — label selector across pods (e.g. `app=api`)
-> - `--pod <name>` / `--container <name>` — narrow scope
-> - `--grep <regex>` — node-side filter (required for large log volumes)
-> - `--since <duration>` — lookback window (default `15m`)
-> - `--tail <n>` — last N lines
-> - `--follow` — stream new matches as they arrive
-> - `--level <level>` — shorthand for common log-level regexes (`error`, `warn`, `info`)
+
+</dt>
+<dd>
+
+Fetch and filter container logs with kubetail's node-side grep.
+
+**Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to Claude. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs the regex filter on the node where the log lives and only sends matching lines back. Typical 100x reduction in transferred data.
+
+**Arguments (all optional, composable):**
+- `--selector <label>` — label selector across pods (e.g. `app=api`)
+- `--pod <name>` / `--container <name>` — narrow scope
+- `--grep <regex>` — node-side filter (required for large log volumes)
+- `--since <duration>` — lookback window (default `15m`)
+- `--tail <n>` — last N lines
+- `--follow` — stream new matches as they arrive
+- `--level <level>` — shorthand for common log-level regexes (`error`, `warn`, `info`)
+
+</dd>
+</dl>
 
 ---
 
@@ -200,63 +227,63 @@ Each skill is invoked with `/<name>` inside a Claude Code session. All skills ar
 All audit skills produce a ranked findings list (severity + evidence + suggested fix) and can emit SARIF via `--format sarif` for CI integration.
 
 #### `/audit-security`
-RBAC review, pod security posture, and privilege-tightening recommendations.
-
-**What it checks:**
-- **RBAC:** overly broad ClusterRoles, `*` verbs, wildcard resource access, service accounts with cluster-admin, unbound roles, stale bindings to deleted principals
-- **Pod security:** containers running as root, missing `securityContext`, privileged containers, `hostNetwork`/`hostPID`/`hostIPC`, writable root FS, dangerous capabilities (`CAP_SYS_ADMIN`, `CAP_NET_ADMIN`), missing `seccompProfile`
-- **Secrets:** secrets mounted but unused, secrets referenced in env vars (vs. mounted files), unencrypted etcd (when detectable)
-
-**Detected integrations:** Kyverno, OPA/Gatekeeper, Falco — surfaces existing policy violations instead of re-scanning.
-
-**Options:**
-- `--standard <ps>` — Pod Security Standard level (`privileged`, `baseline`, `restricted`)
-- `--fix` — emit patched manifests alongside findings
+> RBAC review, pod security posture, and privilege-tightening recommendations.
+>
+> **What it checks:**
+> - **RBAC:** overly broad ClusterRoles, `*` verbs, wildcard resource access, service accounts with cluster-admin, unbound roles, stale bindings to deleted principals
+> - **Pod security:** containers running as root, missing `securityContext`, privileged containers, `hostNetwork`/`hostPID`/`hostIPC`, writable root FS, dangerous capabilities (`CAP_SYS_ADMIN`, `CAP_NET_ADMIN`), missing `seccompProfile`
+> - **Secrets:** secrets mounted but unused, secrets referenced in env vars (vs. mounted files), unencrypted etcd (when detectable)
+>
+> **Detected integrations:** Kyverno, OPA/Gatekeeper, Falco — surfaces existing policy violations instead of re-scanning.
+>
+> **Options:**
+> - `--standard <ps>` — Pod Security Standard level (`privileged`, `baseline`, `restricted`)
+> - `--fix` — emit patched manifests alongside findings
 
 #### `/audit-network`
-NetworkPolicy, Service, Ingress, Gateway API, DNS, and encryption sanity checks.
-
-**What it checks:**
-- **NetworkPolicies:** namespaces with no default-deny, pods matched by zero policies, policies referencing nonexistent labels, redundant/shadowed rules
-- **Services:** Services with no matching endpoints, selectors that hit zero pods, ports mismatched with pod `containerPort`, headless services without StatefulSet
-- **Ingress / Gateway API:** hostname collisions, missing TLS, unreferenced certs, backends pointing at missing services
-- **DNS:** CoreDNS health, NXDOMAIN rates, stub domains, custom `resolv.conf` drift
-- **Encryption:** mTLS coverage when a service mesh is detected (Istio, Linkerd, Cilium)
-
-**Detected integrations:** Cilium (Hubble flow data), Istio, Linkerd.
-
-**Options:**
-- `--graph` — emit a Graphviz/Mermaid diagram of service connectivity
-- `--probe` — actively test reachability between labeled pods (read-only traffic)
+> NetworkPolicy, Service, Ingress, Gateway API, DNS, and encryption sanity checks.
+>
+> **What it checks:**
+> - **NetworkPolicies:** namespaces with no default-deny, pods matched by zero policies, policies referencing nonexistent labels, redundant/shadowed rules
+> - **Services:** Services with no matching endpoints, selectors that hit zero pods, ports mismatched with pod `containerPort`, headless services without StatefulSet
+> - **Ingress / Gateway API:** hostname collisions, missing TLS, unreferenced certs, backends pointing at missing services
+> - **DNS:** CoreDNS health, NXDOMAIN rates, stub domains, custom `resolv.conf` drift
+> - **Encryption:** mTLS coverage when a service mesh is detected (Istio, Linkerd, Cilium)
+>
+> **Detected integrations:** Cilium (Hubble flow data), Istio, Linkerd.
+>
+> **Options:**
+> - `--graph` — emit a Graphviz/Mermaid diagram of service connectivity
+> - `--probe` — actively test reachability between labeled pods (read-only traffic)
 
 #### `/audit-cost`
-Resource waste and right-sizing recommendations.
-
-**What it checks:** requests vs. p95 actual usage (7-day window), workloads with no `resources.requests`, idle nodes, PVCs with zero read/write activity, over-provisioned HPAs (min=max), LoadBalancer services with no traffic, unused PVs.
-
-**Data sources:** metrics-server for short-window data; if Prometheus/VictoriaMetrics is detected, pulls a longer history. If [OpenCost](https://www.opencost.io/) is installed, findings include dollar estimates.
-
-**Options:**
-- `--window <duration>` — lookback for usage stats (default `7d`)
-- `--min-savings <usd>` — suppress findings below a dollar threshold (requires OpenCost)
-- `--namespace <n>` — scope to one namespace for team-level reports
+> Resource waste and right-sizing recommendations.
+>
+> **What it checks:** requests vs. p95 actual usage (7-day window), workloads with no `resources.requests`, idle nodes, PVCs with zero read/write activity, over-provisioned HPAs (min=max), LoadBalancer services with no traffic, unused PVs.
+>
+> **Data sources:** metrics-server for short-window data; if Prometheus/VictoriaMetrics is detected, pulls a longer history. If [OpenCost](https://www.opencost.io/) is installed, findings include dollar estimates.
+>
+> **Options:**
+> - `--window <duration>` — lookback for usage stats (default `7d`)
+> - `--min-savings <usd>` — suppress findings below a dollar threshold (requires OpenCost)
+> - `--namespace <n>` — scope to one namespace for team-level reports
 
 #### `/audit-outdated`
-Outdated cluster components, known CVEs, and available version bumps.
-
-**What it checks:**
-- **Kubernetes itself:** control-plane and node versions vs. latest stable/LTS, version skew across components, end-of-support dates
-- **Workloads:** container image tags vs. latest upstream, digest freshness, Helm releases with newer chart versions available, operators/CRDs behind their controller versions
-- **Known vulnerabilities:** cross-references running images against CVE feeds (Trivy DB by default, Grype optional); correlates CVEs to actually-reachable code paths when an SBOM is available
-- **Deprecated APIs:** manifests using API versions that are deprecated or removed in the next K8s minor
-
-**Data sources:** GitHub/GHCR/quay.io for upstream versions, Trivy DB for CVEs, Helm repo indexes for chart versions, the cluster's own Discovery API for deprecated-API usage.
-
-**Options:**
-- `--severity <level>` — minimum CVE severity to report (`low`, `medium`, `high`, `critical`)
-- `--target-version <ver>` — "if I upgraded to K8s X.Y, what would break?" mode
-- `--include-prereleases` — surface alpha/beta upstream versions
-- `--fix` — emit updated manifests/values files with new versions pinned
+> Outdated cluster components, known CVEs, and available version bumps.
+>
+> **What it checks:**
+> - **Kubernetes itself:** control-plane and node versions vs. latest stable/LTS, version skew across components, end-of-support dates
+> - **Workloads:** container image tags vs. latest upstream, digest freshness, Helm releases with newer chart versions available, operators/CRDs behind their controller versions
+> - **Known vulnerabilities:** cross-references running images against CVE feeds (Trivy DB by default, Grype optional); correlates CVEs to actually-reachable code paths when an SBOM is available
+> - **Deprecated APIs:** manifests using API versions that are deprecated or removed in the next K8s minor
+>
+> **Data sources:** GitHub/GHCR/quay.io for upstream versions, Trivy DB for CVEs, Helm repo indexes for chart versions, the cluster's own Discovery API for deprecated-API usage.
+>
+> **Options:**
+> - `--severity <level>` — minimum CVE severity to report (`low`, `medium`, `high`, `critical`)
+> - `--target-version <ver>` — "if I upgraded to K8s X.Y, what would break?" mode
+> - `--include-prereleases` — surface alpha/beta upstream versions
+> - `--fix` — emit updated manifests/values files with new versions pinned
 
 ## Uninstall
 
