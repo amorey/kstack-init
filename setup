@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# kstack setup — install Kubernetes skills for Claude Code
+set -e
+
+KSTACK_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILLS_DIR="$HOME/.claude/skills"
+
+echo "kstack setup"
+echo "============"
+echo ""
+
+# Check prerequisites
+echo "Checking prerequisites..."
+
+if ! command -v kubectl >/dev/null 2>&1; then
+  echo ""
+  echo "WARNING: kubectl is not installed."
+  echo "  /top requires kubectl to collect cluster data."
+  echo "  Install: https://kubernetes.io/docs/tasks/tools/"
+  echo ""
+  echo "  Continuing setup anyway (you can install kubectl later)."
+  echo ""
+fi
+
+# Register each skill with Claude Code
+# Claude Code discovers skills at ~/.claude/skills/<name>/SKILL.md
+# We create a directory per skill with a symlink to the real SKILL.md
+echo "Registering skills..."
+
+register_skill() {
+  local skill_name="$1"
+  local skill_dir="$SKILLS_DIR/$skill_name"
+  local source="$KSTACK_DIR/$skill_name/SKILL.md"
+
+  if [ ! -f "$source" ]; then
+    echo "  SKIP: $skill_name (no SKILL.md found)"
+    return
+  fi
+
+  mkdir -p "$skill_dir"
+
+  if [ -L "$skill_dir/SKILL.md" ]; then
+    rm "$skill_dir/SKILL.md"
+  fi
+
+  ln -sf "$source" "$skill_dir/SKILL.md"
+  echo "  /$skill_name -> $source"
+}
+
+register_skill "top"
+
+echo ""
+echo "Done! Available skills:"
+echo "  /top — Kubernetes cluster health dashboard"
+echo ""
+echo "Try it: open Claude Code and type /top"
