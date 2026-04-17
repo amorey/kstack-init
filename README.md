@@ -18,7 +18,7 @@ Once you install kstack you'll have access to a set of K8s commands inside Claud
 **Monitoring**
 * `/cluster-status` — Health snapshot (pod restarts, node conditions, resource pressure)
 * `/events` — Recent events, ranked by severity
-* `/watch <resource>` — Background watcher (pings only on state changes)
+* `/watch <resource>` — Background watcher (pings Claude only on state changes)
 
 **Troubleshooting**
 * `/investigate <resource>` — Root-cause analysis across events, logs, and related resources
@@ -45,7 +45,9 @@ cd kstack && claude
 The repo itself already has the skills installed (in `.claude/skills`) so you can start using them right away:
 
 ```console
+─────────────────────────
 > /health
+─────────────────────────
 ```
 
 To install kstack globally, clone the repo into your user-level skills directory and run the `setup` script to symlink the skill set:
