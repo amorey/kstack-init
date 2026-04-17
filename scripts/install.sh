@@ -17,16 +17,22 @@ set -eu
 REPO="kubetail-org/kstack"
 SRC_DIR="$HOME/.config/kstack/src"
 
-TAG=$(curl -sS "https://api.github.com/repos/$REPO/releases/latest" \
-        | grep -o '"tag_name":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
-[ -n "$TAG" ] || { echo "Could not resolve latest kstack release." >&2; exit 1; }
+main() {
+  TAG=$(curl -sS "https://api.github.com/repos/$REPO/releases/latest" \
+          | grep -o '"tag_name":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+  [ -n "$TAG" ] || { echo "Could not resolve latest kstack release." >&2; exit 1; }
 
-if [ -d "$SRC_DIR/.git" ]; then
-  git -C "$SRC_DIR" fetch --tags --quiet
-  git -C "$SRC_DIR" checkout --quiet "$TAG"
-else
-  mkdir -p "$(dirname "$SRC_DIR")"
-  git clone --depth 1 --branch "$TAG" --quiet "https://github.com/$REPO.git" "$SRC_DIR"
+  if [ -d "$SRC_DIR/.git" ]; then
+    git -C "$SRC_DIR" fetch --tags --quiet
+    git -C "$SRC_DIR" checkout --quiet "$TAG"
+  else
+    mkdir -p "$(dirname "$SRC_DIR")"
+    git clone --depth 1 --branch "$TAG" --quiet "https://github.com/$REPO.git" "$SRC_DIR"
+  fi
+
+  exec "$SRC_DIR/install" --global "$@"
+}
+
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+  main "$@"
 fi
-
-exec "$SRC_DIR/install" --global "$@"

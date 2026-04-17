@@ -22,128 +22,128 @@
 # Uses `set -uo pipefail` (no -e) so uninstall never aborts partway.
 set -uo pipefail
 
-if [ -z "${HOME:-}" ]; then
-  echo "ERROR: \$HOME is not set" >&2
-  exit 1
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
-KSTACK_CONFIG_DIR="$HOME/.config/kstack"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# This script only knows how to remove the global install. If invoked from
-# the kstack source repo (not from ~/.config/kstack/bin/), redirect.
-if [ "$SCRIPT_DIR" != "$KSTACK_CONFIG_DIR/bin" ]; then
-  echo "This is the global uninstaller — run it from $KSTACK_CONFIG_DIR/bin/" >&2
-  echo "to remove the global install." >&2
-  echo >&2
-  echo "To remove a repo-local install, just delete the kstack repo directory." >&2
-  exit 1
-fi
-
-KNOWN_AGENTS="claude codex opencode cursor factory slate kiro hermes"
-
-agent_skills_dir_global() {
-  case "$1" in
-    claude)   echo "$HOME/.claude/skills" ;;
-    codex)    echo "$HOME/.codex/skills" ;;
-    opencode) echo "$HOME/.config/opencode/skills" ;;
-    cursor)   echo "$HOME/.cursor/skills" ;;
-    factory)  echo "$HOME/.factory/skills" ;;
-    slate)    echo "$HOME/.slate/skills" ;;
-    kiro)     echo "$HOME/.kiro/skills" ;;
-    hermes)   echo "$HOME/.hermes/skills" ;;
-    *)        return 1 ;;
-  esac
-}
-
-is_known_agent() {
-  case " $KNOWN_AGENTS " in *" $1 "*) return 0 ;; esac
-  return 1
-}
-
-# ─── Flags ────────────────────────────────────────────────────
-FORCE=0
-AGENT=""
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --force) FORCE=1; shift ;;
-    --agent)
-      [ -z "${2:-}" ] && { echo "Missing value for --agent" >&2; exit 1; }
-      AGENT="$2"; shift 2 ;;
-    --agent=*) AGENT="${1#--agent=}"; shift ;;
-    -h|--help)
-      sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
-      exit 0 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
-  esac
-done
-
-# ─── Determine which agents to scan ────────────────────────────
-TARGET_AGENTS=""
-if [ -z "$AGENT" ]; then
-  TARGET_AGENTS="$KNOWN_AGENTS"
+# Locate lib/agents.sh. Global install keeps it at ~/.config/kstack/lib/; the
+# in-repo copy lives one level up from bin/. Tests can override via
+# KSTACK_LIB_DIR.
+if [ -n "${KSTACK_LIB_DIR:-}" ] && [ -f "$KSTACK_LIB_DIR/agents.sh" ]; then
+  _KSTACK_AGENTS_LIB="$KSTACK_LIB_DIR/agents.sh"
+elif [ -f "$SCRIPT_DIR/../lib/agents.sh" ]; then
+  _KSTACK_AGENTS_LIB="$SCRIPT_DIR/../lib/agents.sh"
 else
-  if ! is_known_agent "$AGENT"; then
-    echo "Unknown agent: $AGENT" >&2
-    echo "Supported: $KNOWN_AGENTS" >&2
+  echo "ERROR: cannot locate lib/agents.sh" >&2
+  exit 1
+fi
+# shellcheck source=../lib/agents.sh
+. "$_KSTACK_AGENTS_LIB"
+
+main() {
+  if [ -z "${HOME:-}" ]; then
+    echo "ERROR: \$HOME is not set" >&2
     exit 1
   fi
-  TARGET_AGENTS="$AGENT"
-fi
 
-# ─── Preview + confirm ────────────────────────────────────────
-PREVIEW=""
+  KSTACK_CONFIG_DIR="$HOME/.config/kstack"
 
-for h in $TARGET_AGENTS; do
-  skills_dir="$(agent_skills_dir_global "$h")"
-  [ -d "$skills_dir" ] || continue
-  for entry in "$skills_dir"/kstack-*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    PREVIEW="$PREVIEW  $entry
-"
+  # This script only knows how to remove the global install. If invoked from
+  # the kstack source repo (not from ~/.config/kstack/bin/), redirect.
+  if [ "$SCRIPT_DIR" != "$KSTACK_CONFIG_DIR/bin" ]; then
+    echo "This is the global uninstaller — run it from $KSTACK_CONFIG_DIR/bin/" >&2
+    echo "to remove the global install." >&2
+    echo >&2
+    echo "To remove a repo-local install, just delete the kstack repo directory." >&2
+    exit 1
+  fi
+
+  # ─── Flags ────────────────────────────────────────────────────
+  FORCE=0
+  AGENT=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --force) FORCE=1; shift ;;
+      --agent)
+        [ -z "${2:-}" ] && { echo "Missing value for --agent" >&2; exit 1; }
+        AGENT="$2"; shift 2 ;;
+      --agent=*) AGENT="${1#--agent=}"; shift ;;
+      -h|--help)
+        sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
+        exit 0 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
   done
-done
-[ -d "$KSTACK_CONFIG_DIR" ] && PREVIEW="$PREVIEW  $KSTACK_CONFIG_DIR/
+
+  # ─── Determine which agents to scan ────────────────────────────
+  TARGET_AGENTS=""
+  if [ -z "$AGENT" ]; then
+    TARGET_AGENTS="$KNOWN_AGENTS"
+  else
+    if ! is_known_agent "$AGENT"; then
+      echo "Unknown agent: $AGENT" >&2
+      echo "Supported: $KNOWN_AGENTS" >&2
+      exit 1
+    fi
+    TARGET_AGENTS="$AGENT"
+  fi
+
+  # ─── Preview + confirm ────────────────────────────────────────
+  PREVIEW=""
+
+  for h in $TARGET_AGENTS; do
+    skills_dir="$(agent_skills_dir_global "$h")"
+    [ -d "$skills_dir" ] || continue
+    for entry in "$skills_dir"/kstack-*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      PREVIEW="$PREVIEW  $entry
+"
+    done
+  done
+  [ -d "$KSTACK_CONFIG_DIR" ] && PREVIEW="$PREVIEW  $KSTACK_CONFIG_DIR/
 "
 
-if [ -z "$PREVIEW" ]; then
-  echo "Nothing to remove — kstack is not installed."
+  if [ -z "$PREVIEW" ]; then
+    echo "Nothing to remove — kstack is not installed."
+    exit 0
+  fi
+
+  if [ "$FORCE" -eq 0 ]; then
+    echo "This will remove:"
+    printf '%s' "$PREVIEW"
+    printf "\nContinue? [y/N] "
+    read -r REPLY
+    case "$REPLY" in
+      y|Y|yes|YES) ;;
+      *) echo "Aborted."; exit 0 ;;
+    esac
+  fi
+
+  # ─── Remove ───────────────────────────────────────────────────
+  REMOVED=""
+
+  for h in $TARGET_AGENTS; do
+    skills_dir="$(agent_skills_dir_global "$h")"
+    [ -d "$skills_dir" ] || continue
+    for entry in "$skills_dir"/kstack-*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      rm -rf "$entry"
+      REMOVED="$REMOVED $h/$(basename "$entry")"
+    done
+  done
+  if [ -d "$KSTACK_CONFIG_DIR" ]; then
+    rm -rf "$KSTACK_CONFIG_DIR"
+    REMOVED="$REMOVED ~/.config/kstack/"
+  fi
+
+  if [ -n "$REMOVED" ]; then
+    echo "Removed:$REMOVED"
+    echo "kstack uninstalled."
+  else
+    echo "Nothing to remove."
+  fi
+
   exit 0
+}
+
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+  main "$@"
 fi
-
-if [ "$FORCE" -eq 0 ]; then
-  echo "This will remove:"
-  printf '%s' "$PREVIEW"
-  printf "\nContinue? [y/N] "
-  read -r REPLY
-  case "$REPLY" in
-    y|Y|yes|YES) ;;
-    *) echo "Aborted."; exit 0 ;;
-  esac
-fi
-
-# ─── Remove ───────────────────────────────────────────────────
-REMOVED=""
-
-for h in $TARGET_AGENTS; do
-  skills_dir="$(agent_skills_dir_global "$h")"
-  [ -d "$skills_dir" ] || continue
-  for entry in "$skills_dir"/kstack-*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    rm -rf "$entry"
-    REMOVED="$REMOVED $h/$(basename "$entry")"
-  done
-done
-if [ -d "$KSTACK_CONFIG_DIR" ]; then
-  rm -rf "$KSTACK_CONFIG_DIR"
-  REMOVED="$REMOVED ~/.config/kstack/"
-fi
-
-if [ -n "$REMOVED" ]; then
-  echo "Removed:$REMOVED"
-  echo "kstack uninstalled."
-else
-  echo "Nothing to remove."
-fi
-
-exit 0

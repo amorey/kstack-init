@@ -11,102 +11,11 @@
 
 set -u
 
-QUIET=0
-case "${1:-}" in
-  --quiet|-q) QUIET=1 ;;
-esac
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# ─── Mode detection ───────────────────────────────────────────
-if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
-  MODE=global
-  INSTALL_ROOT="$HOME/.config/kstack"
-  CACHE_DIR="$INSTALL_ROOT/cache"
-else
-  MODE=local
-  INSTALL_ROOT="$(dirname "$SCRIPT_DIR")"
-  CACHE_DIR="$INSTALL_ROOT/.cache/kstack"
-fi
-
-CACHE_FILE="$CACHE_DIR/update.json"
-REMOTE_URL="https://github.com/kubetail-org/kstack.git"
+REMOTE_URL="${KSTACK_REMOTE_URL:-https://github.com/kubetail-org/kstack.git}"
 TTL_SECS=$((24 * 60 * 60))
 
 bail() { exit 0; }
 
-# ─── Resolve INSTALLED ─────────────────────────────────────────
-INSTALLED=""
-if [ "$MODE" = global ]; then
-  if [ -f "$INSTALL_ROOT/install.conf" ]; then
-    INSTALLED="$(cat "$INSTALL_ROOT/install.conf" 2>/dev/null || echo)"
-  fi
-else
-  origin_url="$(git -C "$INSTALL_ROOT" config --get remote.origin.url 2>/dev/null || echo)"
-  case "$origin_url" in
-    *kubetail-org/kstack.git|*kubetail-org/kstack) ;;
-    *) bail ;;
-  esac
-  INSTALLED="$(git -C "$INSTALL_ROOT" describe --tags --exact-match HEAD 2>/dev/null || echo)"
-fi
-
-case "$INSTALLED" in
-  ""|main) bail ;;
-esac
-
-# ─── Read cache ───────────────────────────────────────────────
-mkdir -p "$CACHE_DIR" 2>/dev/null || true
-
-cache_ts=""
-cache_latest=""
-cache_dismissed=""
-if [ -f "$CACHE_FILE" ]; then
-  cache_ts="$(sed -n 's/.*"last_check"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
-  cache_latest="$(sed -n 's/.*"latest_known"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
-  cache_dismissed="$(sed -n 's/.*"dismissed_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
-fi
-
-# ─── Refresh if stale ──────────────────────────────────────────
-now_epoch=$(date +%s)
-cache_epoch=0
-if [ -n "$cache_ts" ]; then
-  cache_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$cache_ts" +%s 2>/dev/null \
-             || date -d "$cache_ts" +%s 2>/dev/null \
-             || echo 0)
-fi
-age=$((now_epoch - cache_epoch))
-
-LATEST="$cache_latest"
-if [ -z "$LATEST" ] || [ "$age" -ge "$TTL_SECS" ] || [ "$age" -lt 0 ]; then
-  fresh=$(git ls-remote --tags "$REMOTE_URL" 'v*' 2>/dev/null \
-    | awk -F'refs/tags/' '/refs\/tags\/v[0-9]/ && !/\^\{\}$/ { print $2 }' \
-    | sort -V | tail -1)
-  if [ -n "$fresh" ]; then
-    LATEST="$fresh"
-    now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    if [ -n "$cache_dismissed" ]; then
-      cat > "$CACHE_FILE.tmp" 2>/dev/null <<EOF
-{
-  "last_check": "$now_iso",
-  "latest_known": "$LATEST",
-  "dismissed_version": "$cache_dismissed"
-}
-EOF
-    else
-      cat > "$CACHE_FILE.tmp" 2>/dev/null <<EOF
-{
-  "last_check": "$now_iso",
-  "latest_known": "$LATEST"
-}
-EOF
-    fi
-    mv "$CACHE_FILE.tmp" "$CACHE_FILE" 2>/dev/null || rm -f "$CACHE_FILE.tmp" 2>/dev/null || true
-  fi
-fi
-
-[ -z "$LATEST" ] && bail
-
-# ─── Compare ──────────────────────────────────────────────────
 # is_newer $a $b → exit 0 if $a > $b via semver sort.
 is_newer() {
   [ "$1" = "$2" ] && return 1
@@ -115,14 +24,112 @@ is_newer() {
   [ "$top" = "$1" ] && return 0 || return 1
 }
 
-if is_newer "$LATEST" "$INSTALLED"; then
-  if [ -n "$cache_dismissed" ] && ! is_newer "$LATEST" "$cache_dismissed"; then
-    [ "$QUIET" -eq 1 ] || echo "kstack $INSTALLED is up to date (update to $LATEST dismissed)."
-    bail
-  fi
-  echo "kstack $LATEST is available (you're on $INSTALLED). Say \"upgrade kstack\" to install, or \"dismiss\" to hide until the next release."
-else
-  [ "$QUIET" -eq 1 ] || echo "kstack $INSTALLED is up to date."
-fi
+main() {
+  QUIET=0
+  case "${1:-}" in
+    --quiet|-q) QUIET=1 ;;
+  esac
 
-exit 0
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+  # ─── Mode detection ───────────────────────────────────────────
+  if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
+    MODE=global
+    INSTALL_ROOT="$HOME/.config/kstack"
+    CACHE_DIR="$INSTALL_ROOT/cache"
+  else
+    MODE=local
+    INSTALL_ROOT="$(dirname "$SCRIPT_DIR")"
+    CACHE_DIR="$INSTALL_ROOT/.cache/kstack"
+  fi
+
+  CACHE_FILE="$CACHE_DIR/update.json"
+
+  # ─── Resolve INSTALLED ─────────────────────────────────────────
+  INSTALLED=""
+  if [ "$MODE" = global ]; then
+    if [ -f "$INSTALL_ROOT/install.conf" ]; then
+      INSTALLED="$(cat "$INSTALL_ROOT/install.conf" 2>/dev/null || echo)"
+    fi
+  else
+    origin_url="$(git -C "$INSTALL_ROOT" config --get remote.origin.url 2>/dev/null || echo)"
+    case "$origin_url" in
+      *kubetail-org/kstack.git|*kubetail-org/kstack) ;;
+      *) bail ;;
+    esac
+    INSTALLED="$(git -C "$INSTALL_ROOT" describe --tags --exact-match HEAD 2>/dev/null || echo)"
+  fi
+
+  case "$INSTALLED" in
+    ""|main) bail ;;
+  esac
+
+  # ─── Read cache ───────────────────────────────────────────────
+  mkdir -p "$CACHE_DIR" 2>/dev/null || true
+
+  cache_ts=""
+  cache_latest=""
+  cache_dismissed=""
+  if [ -f "$CACHE_FILE" ]; then
+    cache_ts="$(sed -n 's/.*"last_check"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
+    cache_latest="$(sed -n 's/.*"latest_known"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
+    cache_dismissed="$(sed -n 's/.*"dismissed_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CACHE_FILE" | head -1)"
+  fi
+
+  # ─── Refresh if stale ──────────────────────────────────────────
+  now_epoch=$(date +%s)
+  cache_epoch=0
+  if [ -n "$cache_ts" ]; then
+    cache_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$cache_ts" +%s 2>/dev/null \
+               || date -d "$cache_ts" +%s 2>/dev/null \
+               || echo 0)
+  fi
+  age=$((now_epoch - cache_epoch))
+
+  LATEST="$cache_latest"
+  if [ -z "$LATEST" ] || [ "$age" -ge "$TTL_SECS" ] || [ "$age" -lt 0 ]; then
+    fresh=$(git ls-remote --tags "$REMOTE_URL" 'v*' 2>/dev/null \
+      | awk -F'refs/tags/' '/refs\/tags\/v[0-9]/ && !/\^\{\}$/ { print $2 }' \
+      | sort -V | tail -1)
+    if [ -n "$fresh" ]; then
+      LATEST="$fresh"
+      now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+      if [ -n "$cache_dismissed" ]; then
+        cat > "$CACHE_FILE.tmp" 2>/dev/null <<EOF
+{
+  "last_check": "$now_iso",
+  "latest_known": "$LATEST",
+  "dismissed_version": "$cache_dismissed"
+}
+EOF
+      else
+        cat > "$CACHE_FILE.tmp" 2>/dev/null <<EOF
+{
+  "last_check": "$now_iso",
+  "latest_known": "$LATEST"
+}
+EOF
+      fi
+      mv "$CACHE_FILE.tmp" "$CACHE_FILE" 2>/dev/null || rm -f "$CACHE_FILE.tmp" 2>/dev/null || true
+    fi
+  fi
+
+  [ -z "$LATEST" ] && bail
+
+  # ─── Compare ──────────────────────────────────────────────────
+  if is_newer "$LATEST" "$INSTALLED"; then
+    if [ -n "$cache_dismissed" ] && ! is_newer "$LATEST" "$cache_dismissed"; then
+      [ "$QUIET" -eq 1 ] || echo "kstack $INSTALLED is up to date (update to $LATEST dismissed)."
+      bail
+    fi
+    echo "kstack $LATEST is available (you're on $INSTALLED). Say \"upgrade kstack\" to install, or \"dismiss\" to hide until the next release."
+  else
+    [ "$QUIET" -eq 1 ] || echo "kstack $INSTALLED is up to date."
+  fi
+
+  exit 0
+}
+
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+  main "$@"
+fi

@@ -33,112 +33,21 @@
 
 set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+# shellcheck source=lib/agents.sh
+. "$SCRIPT_DIR/lib/agents.sh"
 
 KSTACK_CONFIG_DIR="$HOME/.config/kstack"
 KSTACK_GLOBAL_BIN="$KSTACK_CONFIG_DIR/bin"
+KSTACK_GLOBAL_LIB="$KSTACK_CONFIG_DIR/lib"
 KSTACK_SRC="$KSTACK_CONFIG_DIR/src"
 # Canonical upstream. Override via KSTACK_REMOTE_URL env var (useful for CI
 # and testing against a local clone); leave unset for normal user installs.
 KSTACK_REMOTE_URL="${KSTACK_REMOTE_URL:-https://github.com/kubetail-org/kstack.git}"
 
-KNOWN_AGENTS="claude codex opencode cursor factory slate kiro hermes"
-
-# agent_cli: CLI binary to probe for auto-detect
-agent_cli() {
-  case "$1" in
-    claude)   echo claude ;;
-    codex)    echo codex ;;
-    opencode) echo opencode ;;
-    cursor)   echo cursor ;;
-    factory)  echo droid ;;
-    slate)    echo slate ;;
-    kiro)     echo kiro-cli ;;
-    hermes)   echo hermes ;;
-    *)        return 1 ;;
-  esac
-}
-
-# agent_skills_dir_global: where the agent reads skills from (user-level)
-agent_skills_dir_global() {
-  case "$1" in
-    claude)   echo "$HOME/.claude/skills" ;;
-    codex)    echo "$HOME/.codex/skills" ;;
-    opencode) echo "$HOME/.config/opencode/skills" ;;
-    cursor)   echo "$HOME/.cursor/skills" ;;
-    factory)  echo "$HOME/.factory/skills" ;;
-    slate)    echo "$HOME/.slate/skills" ;;
-    kiro)     echo "$HOME/.kiro/skills" ;;
-    hermes)   echo "$HOME/.hermes/skills" ;;
-    *)        return 1 ;;
-  esac
-}
-
-# agent_skills_dir_local: where the agent reads skills from (repo-level)
-agent_skills_dir_local() {
-  local root="$1"
-  case "$2" in
-    claude)   echo "$root/.claude/skills" ;;
-    codex)    echo "$root/.codex/skills" ;;
-    opencode) echo "$root/.config/opencode/skills" ;;
-    cursor)   echo "$root/.cursor/skills" ;;
-    factory)  echo "$root/.factory/skills" ;;
-    slate)    echo "$root/.slate/skills" ;;
-    kiro)     echo "$root/.kiro/skills" ;;
-    hermes)   echo "$root/.hermes/skills" ;;
-    *)        return 1 ;;
-  esac
-}
-
-is_known_agent() {
-  case " $KNOWN_AGENTS " in *" $1 "*) return 0 ;; esac
-  return 1
-}
-
-# ─── Flags ────────────────────────────────────────────────────
 QUIET=0
-AGENT=""
-GLOBAL=0
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --agent)
-      [ -z "${2:-}" ] && { echo "Missing value for --agent" >&2; exit 1; }
-      AGENT="$2"; shift 2 ;;
-    --agent=*) AGENT="${1#--agent=}"; shift ;;
-    --global) GLOBAL=1; shift ;;
-    -q|--quiet) QUIET=1; shift ;;
-    -h|--help)
-      sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
-      exit 0 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
-  esac
-done
-
 log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
-
-# ─── Determine target agents ───────────────────────────────────
-TARGET_AGENTS=""
-if [ -z "$AGENT" ] || [ "$AGENT" = "auto" ]; then
-  for h in $KNOWN_AGENTS; do
-    cli="$(agent_cli "$h")"
-    if command -v "$cli" >/dev/null 2>&1; then
-      TARGET_AGENTS="$TARGET_AGENTS $h"
-    fi
-  done
-  if [ -z "$TARGET_AGENTS" ]; then
-    log "No agent CLIs detected on PATH — installing for claude by default."
-    TARGET_AGENTS="claude"
-  fi
-else
-  if ! is_known_agent "$AGENT"; then
-    echo "Unknown agent: $AGENT" >&2
-    echo "Supported: $KNOWN_AGENTS" >&2
-    exit 1
-  fi
-  TARGET_AGENTS="$AGENT"
-fi
-
-TARGET_AGENTS="$(echo "$TARGET_AGENTS" | awk '{$1=$1; print}')"
 
 # ─── Maintained checkout (global mode only) ───────────────────
 # Clones (first time) or fetches+checks-out (subsequent runs) the canonical
@@ -181,46 +90,9 @@ ensure_src_checkout() {
   fi
 }
 
-# ─── Resolve render source ────────────────────────────────────
-if [ "$GLOBAL" -eq 1 ]; then
-  ensure_src_checkout
-  SRC_ROOT="$KSTACK_SRC"
-else
-  SRC_ROOT="$SCRIPT_DIR"
-fi
-
-SKILLS_SRC="$SRC_ROOT/skills"
-BIN_DIR="$SRC_ROOT/bin"
-
-# ─── Discover skills ──────────────────────────────────────────
-if [ ! -d "$SKILLS_SRC" ]; then
-  echo "No skills/ directory at $SKILLS_SRC" >&2
-  exit 1
-fi
-
-SKILL_NAMES=""
-for d in "$SKILLS_SRC"/*/; do
-  [ -f "${d}SKILL.md.tmpl" ] || continue
-  SKILL_NAMES="$SKILL_NAMES $(basename "$d")"
-done
-SKILL_NAMES="$(echo "$SKILL_NAMES" | awk '{$1=$1; print}')"
-
-if [ -z "$SKILL_NAMES" ]; then
-  echo "No SKILL.md.tmpl files found under $SKILLS_SRC" >&2
-  exit 1
-fi
-
-GLOBAL_FLAGS_PARTIAL="$SKILLS_SRC/_partials/global-flags.md"
-UPDATE_CHECK_PARTIAL="$SKILLS_SRC/_partials/update-check.md"
-for p in "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"; do
-  if [ ! -f "$p" ]; then
-    echo "ERROR: missing partial: $p" >&2
-    exit 1
-  fi
-done
-
-# ─── Render + install ─────────────────────────────────────────
-# render_skill $skill $agent $install_root $bin_dir $out_file
+# render_skill — expand template with partials and scalars.
+# Args: $1 skill $2 agent $3 install_root $4 bin_dir $5 out_file
+# Reads globals: SKILLS_SRC, GLOBAL_FLAGS_PARTIAL, UPDATE_CHECK_PARTIAL
 render_skill() {
   local skill="$1" agent="$2" install_root="$3" bin_dir="$4" out_file="$5"
   local src="$SKILLS_SRC/$skill/SKILL.md.tmpl"
@@ -297,28 +169,123 @@ copy_bin_global() {
   log "  bin/ → $KSTACK_GLOBAL_BIN"
 }
 
-# ─── Go ────────────────────────────────────────────────────────
-if [ "$GLOBAL" -eq 1 ]; then
-  log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
-  mkdir -p "$KSTACK_CONFIG_DIR/cache"
-  copy_bin_global
-  for h in $TARGET_AGENTS; do
-    install_agent_global "$h"
+copy_lib_global() {
+  mkdir -p "$KSTACK_GLOBAL_LIB"
+  for f in "$SRC_ROOT/lib"/*.sh; do
+    [ -e "$f" ] || continue
+    cp "$f" "$KSTACK_GLOBAL_LIB/"
   done
-else
-  log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
-  mkdir -p "$SCRIPT_DIR/.cache/kstack"
-  for h in $TARGET_AGENTS; do
-    install_agent_local "$h"
-  done
-fi
+  log "  lib/ → $KSTACK_GLOBAL_LIB"
+}
 
-log ""
-log "kstack installed. Start a session with your agent to use the skills."
-if [ "$GLOBAL" -eq 1 ]; then
-  log "To upgrade:   $KSTACK_GLOBAL_BIN/upgrade"
-  log "To uninstall: $KSTACK_GLOBAL_BIN/uninstall"
-else
-  log "To upgrade:   git pull && ./install"
-  log "To uninstall: delete this kstack repo directory."
+main() {
+  AGENT=""
+  GLOBAL=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --agent)
+        [ -z "${2:-}" ] && { echo "Missing value for --agent" >&2; exit 1; }
+        AGENT="$2"; shift 2 ;;
+      --agent=*) AGENT="${1#--agent=}"; shift ;;
+      --global) GLOBAL=1; shift ;;
+      -q|--quiet) QUIET=1; shift ;;
+      -h|--help)
+        sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
+        exit 0 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  # ─── Determine target agents ───────────────────────────────────
+  TARGET_AGENTS=""
+  if [ -z "$AGENT" ] || [ "$AGENT" = "auto" ]; then
+    for h in $KNOWN_AGENTS; do
+      cli="$(agent_cli "$h")"
+      if command -v "$cli" >/dev/null 2>&1; then
+        TARGET_AGENTS="$TARGET_AGENTS $h"
+      fi
+    done
+    if [ -z "$TARGET_AGENTS" ]; then
+      log "No agent CLIs detected on PATH — installing for claude by default."
+      TARGET_AGENTS="claude"
+    fi
+  else
+    if ! is_known_agent "$AGENT"; then
+      echo "Unknown agent: $AGENT" >&2
+      echo "Supported: $KNOWN_AGENTS" >&2
+      exit 1
+    fi
+    TARGET_AGENTS="$AGENT"
+  fi
+
+  TARGET_AGENTS="$(echo "$TARGET_AGENTS" | awk '{$1=$1; print}')"
+
+  # ─── Resolve render source ────────────────────────────────────
+  if [ "$GLOBAL" -eq 1 ]; then
+    ensure_src_checkout
+    SRC_ROOT="$KSTACK_SRC"
+  else
+    SRC_ROOT="$SCRIPT_DIR"
+  fi
+
+  SKILLS_SRC="$SRC_ROOT/skills"
+  BIN_DIR="$SRC_ROOT/bin"
+
+  # ─── Discover skills ──────────────────────────────────────────
+  if [ ! -d "$SKILLS_SRC" ]; then
+    echo "No skills/ directory at $SKILLS_SRC" >&2
+    exit 1
+  fi
+
+  SKILL_NAMES=""
+  for d in "$SKILLS_SRC"/*/; do
+    [ -f "${d}SKILL.md.tmpl" ] || continue
+    SKILL_NAMES="$SKILL_NAMES $(basename "$d")"
+  done
+  SKILL_NAMES="$(echo "$SKILL_NAMES" | awk '{$1=$1; print}')"
+
+  if [ -z "$SKILL_NAMES" ]; then
+    echo "No SKILL.md.tmpl files found under $SKILLS_SRC" >&2
+    exit 1
+  fi
+
+  GLOBAL_FLAGS_PARTIAL="$SKILLS_SRC/_partials/global-flags.md"
+  UPDATE_CHECK_PARTIAL="$SKILLS_SRC/_partials/update-check.md"
+  for p in "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"; do
+    if [ ! -f "$p" ]; then
+      echo "ERROR: missing partial: $p" >&2
+      exit 1
+    fi
+  done
+
+  # ─── Go ────────────────────────────────────────────────────────
+  if [ "$GLOBAL" -eq 1 ]; then
+    log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
+    mkdir -p "$KSTACK_CONFIG_DIR/cache"
+    copy_bin_global
+    copy_lib_global
+    for h in $TARGET_AGENTS; do
+      install_agent_global "$h"
+    done
+  else
+    log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
+    mkdir -p "$SCRIPT_DIR/.cache/kstack"
+    for h in $TARGET_AGENTS; do
+      install_agent_local "$h"
+    done
+  fi
+
+  log ""
+  log "kstack installed. Start a session with your agent to use the skills."
+  if [ "$GLOBAL" -eq 1 ]; then
+    log "To upgrade:   $KSTACK_GLOBAL_BIN/upgrade"
+    log "To uninstall: $KSTACK_GLOBAL_BIN/uninstall"
+  else
+    log "To upgrade:   git pull && ./install"
+    log "To uninstall: delete this kstack repo directory."
+  fi
+}
+
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+  main "$@"
 fi

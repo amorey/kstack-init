@@ -26,16 +26,22 @@ PATHS="
   .build
 "
 
-removed=0
-for p in $PATHS; do
-  full="$REPO_ROOT/$p"
-  if [ -e "$full" ]; then
-    rm -rf "$full"
-    echo "removed $p"
-    removed=$((removed + 1))
-  fi
-done
+main() {
+  removed=0
+  for p in $PATHS; do
+    full="$REPO_ROOT/$p"
+    if [ -e "$full" ]; then
+      rm -rf "$full"
+      echo "removed $p"
+      removed=$((removed + 1))
+    fi
+  done
 
-if [ "$removed" -eq 0 ]; then
-  echo "Nothing to clean."
+  if [ "$removed" -eq 0 ]; then
+    echo "Nothing to clean."
+  fi
+}
+
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+  main "$@"
 fi

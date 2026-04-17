@@ -5,13 +5,19 @@
 
 set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+main() {
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
-  exec "$HOME/.config/kstack/src/install" --global "$@"
+  if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
+    exec "$HOME/.config/kstack/src/install" --global "$@"
+  fi
+
+  REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+  cd "$REPO_ROOT"
+  git pull --ff-only
+  exec ./install "$@"
+}
+
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+  main "$@"
 fi
-
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-cd "$REPO_ROOT"
-git pull --ff-only
-exec ./install "$@"

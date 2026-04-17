@@ -354,6 +354,19 @@ For a global install, run the uninstall helper bundled at `~/.config/kstack/bin/
 
 For a repo-local install, just delete the kstack repo directory. The local install renders skills directly into `<repo>/.<agent>/skills/` and never writes outside the repo, so there is nothing else to clean up.
 
+## Development
+
+Run the test suite with bats-core:
+
+```console
+brew install bats-core        # macOS
+# or: apt install bats        # Debian/Ubuntu
+
+./scripts/test.sh
+```
+
+Tests live in `tests/unit/` (sourced-function tests) and `tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu and macOS for every push and PR — see `.github/workflows/test.yml`.
+
 ## Get Involved
 
 At Kubetail, we're building the most **user-friendly**, **cost-effective**, and **secure** logging platform for Kubernetes and we'd love your contributions! Here's how you can help:
@@ -362,7 +375,7 @@ At Kubetail, we're building the most **user-friendly**, **cost-effective**, and 
 * React frontend development
 * Reporting issues and suggesting features
 
-Reach us at hello@kubetail.com, or join our [Discord server](https://discord.gg/CmsmWAVkvX) or [Slack channel](https://join.slack.com/t/kubetail/shared_invite/zt-2cq01cbm8-e1kbLT3EmcLPpHSeoFYm1w).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines. Reach us at hello@kubetail.com, or join our [Discord server](https://discord.gg/CmsmWAVkvX) or [Slack channel](https://join.slack.com/t/kubetail/shared_invite/zt-2cq01cbm8-e1kbLT3EmcLPpHSeoFYm1w).
 
 ## Notes
 
