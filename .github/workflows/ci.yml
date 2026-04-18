@@ -21,7 +21,7 @@ jobs:
             install \
             src/install \
             src/bin/check-update src/bin/dismiss-update src/bin/uninstall src/bin/upgrade \
-            src/lib/*.sh src/lib/*/*.sh src/scripts/*.sh \
+            src/lib/*.sh src/scripts/*.sh \
             src/skills/cluster-status/scripts/snapshot \
             src/tests/test_helper.bash
 
