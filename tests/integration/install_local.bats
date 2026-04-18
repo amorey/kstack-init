@@ -114,37 +114,43 @@ setup() {
   [ -f "$FAKE_ROOT/.claude/skills/demo/SKILL.md" ]
 }
 
-@test "install renders SKILL.man alongside SKILL.md" {
+@test "install renders help.md under references/ alongside SKILL.md" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/references/help.md"
 }
 
-@test "SKILL.man contains the README skill body" {
+@test "install creates references/ directory next to SKILL.md" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "A fixture skill used by tests." "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+  [ -d "$FAKE_ROOT/.claude/skills/demo/references" ]
+}
+
+@test "help.md contains the README skill body" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run grep -F "A fixture skill used by tests." "$FAKE_ROOT/.claude/skills/demo/references/help.md"
   [ "$status" -eq 0 ]
 }
 
-@test "SKILL.man contains the global flags table" {
+@test "help.md contains the global flags table" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F -e "--context <ctx>" "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+  run grep -F -e "--context <ctx>" "$FAKE_ROOT/.claude/skills/demo/references/help.md"
   [ "$status" -eq 0 ]
 }
 
-@test "SKILL.man ends with END HELP sentinel" {
+@test "help.md ends with END HELP sentinel" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  run tail -n 1 "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+  run tail -n 1 "$FAKE_ROOT/.claude/skills/demo/references/help.md"
   [[ "$output" == *"=== END HELP ==="* ]]
 }
 
-@test "SKILL.md man_path placeholder resolves to absolute SKILL.man path" {
+@test "SKILL.md help_path placeholder resolves to absolute help.md path" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "man_path: $FAKE_ROOT/.claude/skills/demo/SKILL.man" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  run grep -F "help_path: $FAKE_ROOT/.claude/skills/demo/references/help.md" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 

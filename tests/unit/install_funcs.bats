@@ -10,17 +10,17 @@ setup() {
   UC="$SKILLS_SRC/_partials/update-check.md"
   README="$FIXTURES_DIR/README.md"
   OUT="$TMPDIR_TEST/out/SKILL.md"
-  MAN="$TMPDIR_TEST/out/SKILL.man"
+  HELP="$TMPDIR_TEST/out/references/help.md"
   mkdir -p "$TMPDIR_TEST/out"
 }
 
 render() {
-  local man_path="${5:-/install/path/SKILL.man}"
-  render_skill "$1" "$2" "$3" "$4" "$man_path" "$OUT" "$SKILLS_SRC" "$GF" "$UC"
+  local help_path="${5:-/install/path/references/help.md}"
+  render_skill "$1" "$2" "$3" "$4" "$help_path" "$OUT" "$SKILLS_SRC" "$GF" "$UC"
 }
 
-render_m() {
-  render_man "$1" "$README" "$MAN"
+render_h() {
+  render_help "$1" "$README" "$HELP"
 }
 
 @test "render_skill substitutes SKILL_NAME and AGENT" {
@@ -35,9 +35,9 @@ render_m() {
   grep -F "bin_dir: /my/bin" "$OUT"
 }
 
-@test "render_skill substitutes MAN_PATH" {
-  render demo claude /root /bin /skills/demo/SKILL.man
-  grep -F "man_path: /skills/demo/SKILL.man" "$OUT"
+@test "render_skill substitutes HELP_PATH" {
+  render demo claude /root /bin /skills/demo/references/help.md
+  grep -F "help_path: /skills/demo/references/help.md" "$OUT"
 }
 
 @test "render_skill inlines both partials" {
@@ -62,56 +62,56 @@ render_m() {
   [ -f "$OUT" ]
 }
 
-@test "render_man extracts the skill section body from README" {
-  render_m demo
-  grep -F "A fixture skill used by tests." "$MAN"
-  grep -F "nothing real" "$MAN"
-  grep -F "flag-one" "$MAN"
+@test "render_help extracts the skill section body from README" {
+  render_h demo
+  grep -F "A fixture skill used by tests." "$HELP"
+  grep -F "nothing real" "$HELP"
+  grep -F "flag-one" "$HELP"
 }
 
-@test "render_man prepends a title line for the skill" {
-  render_m demo
-  head -n 1 "$MAN" | grep -F "/demo"
+@test "render_help prepends a title line for the skill" {
+  render_h demo
+  head -n 1 "$HELP" | grep -F "/demo"
 }
 
-@test "render_man strips <dd> and </dd> HTML tags" {
-  render_m demo
-  ! grep -F "<dd>" "$MAN"
-  ! grep -F "</dd>" "$MAN"
+@test "render_help strips <dd> and </dd> HTML tags" {
+  render_h demo
+  ! grep -F "<dd>" "$HELP"
+  ! grep -F "</dd>" "$HELP"
 }
 
-@test "render_man stops at the closing </dd> of the target skill" {
-  render_m demo
+@test "render_help stops at the closing </dd> of the target skill" {
+  render_h demo
   # Should not leak into the /demo-with-args section below it.
-  ! grep -F "demo-with-args" "$MAN"
-  ! grep -F "Variant whose heading" "$MAN"
+  ! grep -F "demo-with-args" "$HELP"
+  ! grep -F "Variant whose heading" "$HELP"
 }
 
-@test "render_man matches a skill whose heading carries an argument" {
-  render_man demo-with-args "$README" "$MAN"
-  grep -F "Variant whose heading" "$MAN"
-  ! grep -F "A fixture skill used by tests." "$MAN"
+@test "render_help matches a skill whose heading carries an argument" {
+  render_help demo-with-args "$README" "$HELP"
+  grep -F "Variant whose heading" "$HELP"
+  ! grep -F "A fixture skill used by tests." "$HELP"
 }
 
-@test "render_man appends the global flags table from README" {
-  render_m demo
-  grep -F "Global flags" "$MAN"
-  grep -F -e "--context <ctx>" "$MAN"
-  grep -F -e "--dry-run" "$MAN"
+@test "render_help appends the global flags table from README" {
+  render_h demo
+  grep -F "Global flags" "$HELP"
+  grep -F -e "--context <ctx>" "$HELP"
+  grep -F -e "--dry-run" "$HELP"
 }
 
-@test "render_man ends with the END HELP sentinel" {
-  render_m demo
-  tail -n 1 "$MAN" | grep -F "=== END HELP ==="
+@test "render_help ends with the END HELP sentinel" {
+  render_h demo
+  tail -n 1 "$HELP" | grep -F "=== END HELP ==="
 }
 
-@test "render_man exits non-zero when README has no matching section" {
-  run render_man nosuch-skill "$README" "$MAN"
+@test "render_help exits non-zero when README has no matching section" {
+  run render_help nosuch-skill "$README" "$HELP"
   [ "$status" -ne 0 ]
 }
 
-@test "render_man creates output parent dir" {
-  MAN="$TMPDIR_TEST/out/nested/sub/SKILL.man"
-  render_m demo
-  [ -f "$MAN" ]
+@test "render_help creates output parent dir" {
+  HELP="$TMPDIR_TEST/out/nested/sub/help.md"
+  render_h demo
+  [ -f "$HELP" ]
 }

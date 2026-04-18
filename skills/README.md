@@ -8,7 +8,7 @@ Every kstack skill lives under `skills/<name>/` and is authored as a `SKILL.md.t
 |---------------------|--------------------------------------------------|------------------------------------------------------|------------------------------------------------|
 | `{{INSTALL_ROOT}}`  | `<repo>`                                         | `~/.config/kstack`                                   | The root that owns `bin/` for this install     |
 | `{{BIN_DIR}}`       | `<repo>/bin`                                     | `~/.config/kstack/bin`                               | Stable absolute path to compiled helpers       |
-| `{{MAN_PATH}}`      | `<repo>/.<agent>/skills/<name>/SKILL.man`        | `~/.<agent>/skills/kstack-<name>/SKILL.man`          | Absolute path to this skill's rendered man page|
+| `{{HELP_PATH}}`     | `<repo>/.<agent>/skills/<name>/references/help.md` | `~/.<agent>/skills/kstack-<name>/references/help.md` | Absolute path to this skill's rendered help page |
 | `{{SKILL_NAME}}`    | bare skill name                                  | bare skill name                                      | e.g. `cluster-status` (drives slash command)   |
 | `{{AGENT}}`         | `claude` / `codex` / …                           | `claude` / `codex` / …                               | Target agent                                   |
 | `{{GLOBAL_FLAGS}}`  | inlined partial content                          | inlined partial content                              | See Partials                                   |
@@ -21,7 +21,7 @@ Every kstack skill lives under `skills/<name>/` and is authored as a `SKILL.md.t
 3. Agent install paths come from the table in the top-level `README.md`.
 4. When a skill body shells out to a compiled helper, use `{{BIN_DIR}}/<tool>` so the absolute path is baked in at install time.
 5. Repo-local install artifacts (`<repo>/.<agent>/skills/<name>/`) are gitignored — only `.tmpl` sources are tracked.
-6. Alongside each `SKILL.md`, `install` renders a `SKILL.man` from the top-level `README.md`'s per-skill `<dt>/<dd>` section plus the global-flags table. The file ends with the literal line `=== END HELP ===`. The `{{GLOBAL_FLAGS}}` partial instructs the skill to `cat {{MAN_PATH}}` on `--help` and to treat the sentinel as end-of-turn. Every skill directory listed in `skills/` must have a matching section in the top-level `README.md`; `install` aborts otherwise.
+6. For each skill, `install` renders `references/help.md` (next to `SKILL.md`) from the top-level `README.md`'s per-skill `<dt>/<dd>` section plus the global-flags table. The file ends with the literal line `=== END HELP ===`. The `{{GLOBAL_FLAGS}}` partial instructs the skill to `cat {{HELP_PATH}}` on `--help` and to treat the sentinel as end-of-turn. Every skill directory listed in `skills/` must have a matching section in the top-level `README.md`; `install` aborts otherwise. The `references/` and (future) `scripts/` subdirectories follow Anthropic's recommended skill layout — auxiliary files the agent loads on demand, kept out of the main `SKILL.md`.
 
 ## Partials
 

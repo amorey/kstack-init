@@ -1,6 +1,6 @@
 # Fixture README
 
-Used by render_man tests. Mirrors the real README's per-skill `<dt>/<dd>` structure so the extractor can be exercised on a stable, minimal input.
+Used by render_help tests. Mirrors the real README's per-skill `<dt>/<dd>` structure so the extractor can be exercised on a stable, minimal input.
 
 ## Skills Reference
 
