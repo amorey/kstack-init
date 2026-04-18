@@ -429,7 +429,7 @@ For a repo-local install, just delete the kstack repo directory. The local insta
 
 ## Development
 
-The source tree lives under `src/` (skills, helpers, scripts, tests). The repo root stays deliberately minimal for end users — just `README.md`, an `install` wrapper, `assets/`, and the usual metadata. If you're hacking on kstack, see `src/CLAUDE.md` for the full contributor guide.
+The source tree lives under `src/` (skills, helpers, scripts, tests). The repo root stays deliberately minimal for end users — just `README.md`, the `install` entrypoint, `assets/`, and the usual metadata. If you're hacking on kstack, see `src/CLAUDE.md` for the full contributor guide.
 
 Run the test suite with bats-core:
 

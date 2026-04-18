@@ -4,21 +4,13 @@ setup() {
   load '../test_helper.bash'
   common_setup
 
-  # Build a minimal fake kstack checkout with the nested src/ layout that the
-  # real repo uses: top-level install wrapper + src/{install,lib,bin,skills,...}.
+  # Build a minimal fake kstack checkout mirroring the real layout: a
+  # top-level install script plus src/{lib,bin,skills,...}.
   FAKE_ROOT="$TMPDIR_TEST/kstack"
   mkdir -p "$FAKE_ROOT/src/bin" "$FAKE_ROOT/src/lib" \
            "$FAKE_ROOT/src/skills/demo" "$FAKE_ROOT/src/skills/_partials"
 
-  # Thin wrapper at repo root — mirrors the real <repo>/install.
-  cat > "$FAKE_ROOT/install" <<'EOF'
-#!/usr/bin/env bash
-set -eu
-exec "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/src/install" "$@"
-EOF
-  chmod +x "$FAKE_ROOT/install"
-
-  cp "$REPO_ROOT/install" "$FAKE_ROOT/src/install"
+  cp "$CHECKOUT_ROOT/install" "$FAKE_ROOT/install"
   cp "$REPO_ROOT/lib/agents.sh" "$FAKE_ROOT/src/lib/agents.sh"
   cp "$REPO_ROOT/lib/cache.sh" "$FAKE_ROOT/src/lib/cache.sh"
   cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/src/skills/demo/SKILL.md.tmpl"
@@ -29,7 +21,7 @@ EOF
 #!/usr/bin/env bash
 echo hello
 EOF
-  chmod +x "$FAKE_ROOT/src/bin/hello" "$FAKE_ROOT/src/install"
+  chmod +x "$FAKE_ROOT/src/bin/hello" "$FAKE_ROOT/install"
 }
 
 @test "install --agent claude renders SKILL.md into .claude/skills/demo" {

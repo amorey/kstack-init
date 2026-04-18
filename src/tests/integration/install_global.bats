@@ -17,13 +17,8 @@ setup() {
     git config user.name "Test"
 
     mkdir -p src/bin src/lib src/skills/demo/scripts src/skills/_partials
-    # Thin wrapper at repo root, real install under src/ — mirrors the real repo.
-    cat > install <<'EOF'
-#!/usr/bin/env bash
-set -eu
-exec "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/src/install" "$@"
-EOF
-    cp "$REPO_ROOT/install" src/install
+    # Install script at repo root — mirrors the real repo layout.
+    cp "$CHECKOUT_ROOT/install" install
     cp "$REPO_ROOT/lib/agents.sh" src/lib/agents.sh
     cp "$REPO_ROOT/lib/cache.sh" src/lib/cache.sh
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
@@ -38,7 +33,7 @@ EOF
 #!/usr/bin/env bash
 echo snap
 EOF
-    chmod +x install src/install src/bin/hello src/skills/demo/scripts/snapshot
+    chmod +x install src/bin/hello src/skills/demo/scripts/snapshot
     git add -A
     git commit --quiet -m "init"
     git branch -M main
@@ -50,7 +45,7 @@ EOF
 
   # install script under test: the one in the bare-repo-cloned source.
   # Run the in-repo one — it will ensure_src_checkout from our local bare repo.
-  RUN_INSTALL="$REPO_ROOT/install"
+  RUN_INSTALL="$CHECKOUT_ROOT/install"
   export KSTACK_REMOTE_URL="$BARE"
 }
 
