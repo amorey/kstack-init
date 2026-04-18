@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 # Copyright 2026 The Kubetail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 # scripts/test-e2e.sh — run the e2e (cluster-backed) bats tier.
 #
 # Spins up a kind cluster via tests/e2e/setup_suite.bash, runs the tests,

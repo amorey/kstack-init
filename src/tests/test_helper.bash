@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 # shellcheck shell=bash
 # shellcheck disable=SC2034  # vars like SRC_ROOT/REPO_ROOT/FIXTURES_DIR are consumed by tests that source this file.
 # Shared helpers for the kstack bats suite.

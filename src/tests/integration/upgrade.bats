@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+
 # Copyright 2026 The Kubetail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
