@@ -23,6 +23,7 @@ setup() {
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" skills/demo/SKILL.md.tmpl
     cp "$FIXTURES_DIR/skills/_partials/global-flags.md" skills/_partials/global-flags.md
     cp "$FIXTURES_DIR/skills/_partials/update-check.md" skills/_partials/update-check.md
+    cp "$FIXTURES_DIR/README.md" README.md
     cat > bin/hello <<'EOF'
 #!/usr/bin/env bash
 echo hello

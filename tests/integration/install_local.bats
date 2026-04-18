@@ -13,6 +13,7 @@ setup() {
   cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/skills/demo/SKILL.md.tmpl"
   cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/skills/_partials/global-flags.md"
   cp "$FIXTURES_DIR/skills/_partials/update-check.md" "$FAKE_ROOT/skills/_partials/update-check.md"
+  cp "$FIXTURES_DIR/README.md" "$FAKE_ROOT/README.md"
   : > "$FAKE_ROOT/bin/.gitkeep"
   chmod +x "$FAKE_ROOT/install"
 }
@@ -111,4 +112,46 @@ setup() {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -f "$FAKE_ROOT/.claude/skills/demo/SKILL.md" ]
+}
+
+@test "install renders SKILL.man alongside SKILL.md" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+}
+
+@test "SKILL.man contains the README skill body" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run grep -F "A fixture skill used by tests." "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+  [ "$status" -eq 0 ]
+}
+
+@test "SKILL.man contains the global flags table" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run grep -F -e "--context <ctx>" "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+  [ "$status" -eq 0 ]
+}
+
+@test "SKILL.man ends with END HELP sentinel" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$FAKE_ROOT/.claude/skills/demo/SKILL.man"
+  [[ "$output" == *"=== END HELP ==="* ]]
+}
+
+@test "SKILL.md man_path placeholder resolves to absolute SKILL.man path" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run grep -F "man_path: $FAKE_ROOT/.claude/skills/demo/SKILL.man" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "install aborts when README has no section for a skill" {
+  rm "$FAKE_ROOT/README.md"
+  : > "$FAKE_ROOT/README.md"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no README section for /demo"* ]]
 }

@@ -87,18 +87,20 @@ ensure_src_checkout() {
   fi
 }
 
-# render_skill $skill $agent $install_root $bin_dir $out_file $skills_src $global_flags_partial $update_check_partial
+# render_skill $skill $agent $install_root $bin_dir $man_path $out_file $skills_src $global_flags_partial $update_check_partial
 render_skill() {
-  local skill="$1" agent="$2" install_root="$3" bin_dir="$4" out_file="$5"
-  local skills_src="$6" gf="$7" uc="$8"
+  local skill="$1" agent="$2" install_root="$3" bin_dir="$4" man_path="$5" out_file="$6"
+  local skills_src="$7" gf="$8" uc="$9"
   mkdir -p "$(dirname "$out_file")"
   awk -v gf="$gf" -v uc="$uc" \
       -v install_root="$install_root" -v bin_dir="$bin_dir" \
+      -v man_path="$man_path" \
       -v skill="$skill" -v agent="$agent" '
     function inline(path,    line) {
       while ((getline line < path) > 0) {
         gsub(/\{\{INSTALL_ROOT\}\}/, install_root, line)
         gsub(/\{\{BIN_DIR\}\}/,      bin_dir,      line)
+        gsub(/\{\{MAN_PATH\}\}/,     man_path,     line)
         gsub(/\{\{SKILL_NAME\}\}/,   skill,        line)
         gsub(/\{\{AGENT\}\}/,        agent,        line)
         print line
@@ -110,11 +112,55 @@ render_skill() {
     {
       gsub(/\{\{INSTALL_ROOT\}\}/, install_root)
       gsub(/\{\{BIN_DIR\}\}/,      bin_dir)
+      gsub(/\{\{MAN_PATH\}\}/,     man_path)
       gsub(/\{\{SKILL_NAME\}\}/,   skill)
       gsub(/\{\{AGENT\}\}/,        agent)
       print
     }
   ' "$skills_src/$skill/SKILL.md.tmpl" > "$out_file"
+}
+
+# render_man $skill $readme $out_file
+#
+# Renders a plain-text man page for $skill by extracting its <dt>/<dd> block
+# from $readme and appending the global-flags table. Exits non-zero if no
+# matching section is found. The output ends with the literal sentinel
+# "=== END HELP ===" which the skill body uses to detect end-of-help.
+render_man() {
+  local skill="$1" readme="$2" out_file="$3"
+  mkdir -p "$(dirname "$out_file")"
+
+  awk -v skill="$skill" '
+    BEGIN { found = 0; in_skill = 0; in_body = 0; in_flags = 0 }
+
+    # Skill body: capture lines between <dd> and </dd> under the target heading.
+    $0 ~ "^#### `/" skill "(`| )" {
+      found = 1
+      in_skill = 1
+      body = body "# /" skill "\n\n"
+      next
+    }
+    in_skill && /^<dd>$/ { in_body = 1; next }
+    in_body && /^<\/dd>$/ { in_body = 0; in_skill = 0; next }
+    in_body { body = body $0 "\n"; next }
+
+    # Global flags: from "**Global flags**" line to the next horizontal rule.
+    /^\*\*Global flags\*\*/ { in_flags = 1 }
+    in_flags && /^---$/ { in_flags = 0; next }
+    in_flags { flags = flags $0 "\n" }
+
+    END {
+      if (!found) {
+        print "render_man: no README section for /" skill > "/dev/stderr"
+        exit 2
+      }
+      printf "%s\n%s\n=== END HELP ===\n", body, flags
+    }
+  ' "$readme" > "$out_file" || {
+    local rc=$?
+    rm -f "$out_file"
+    return "$rc"
+  }
 }
 
 # install_agent $mode $agent $install_root $bin_dir $skills_dir $slot_prefix
@@ -124,19 +170,22 @@ install_agent() {
   local mode="$1" agent="$2" install_root="$3" bin_dir="$4" skills_dir="$5" slot_prefix="$6"
   mkdir -p "$skills_dir"
 
-  local installed="" skill out_dir out_file
+  local installed="" skill out_dir out_file man_file
   for skill in $SKILL_NAMES; do
     out_dir="$skills_dir/${slot_prefix}${skill}"
     out_file="$out_dir/SKILL.md"
+    man_file="$out_dir/SKILL.man"
     # Remove anything blocking the skill slot from being a directory
     # (stale symlinks on Unix, or leftover files on any platform).
     if [ -L "$out_dir" ] || { [ -e "$out_dir" ] && [ ! -d "$out_dir" ]; }; then
       rm -f "$out_dir"
     fi
     [ -L "$out_file" ] && rm -f "$out_file"
+    [ -L "$man_file" ] && rm -f "$man_file"
     mkdir -p "$out_dir"
-    render_skill "$skill" "$agent" "$install_root" "$bin_dir" "$out_file" \
+    render_skill "$skill" "$agent" "$install_root" "$bin_dir" "$man_file" "$out_file" \
       "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"
+    render_man "$skill" "$SRC_ROOT/README.md" "$man_file"
     installed="$installed ${slot_prefix}${skill}"
   done
 
