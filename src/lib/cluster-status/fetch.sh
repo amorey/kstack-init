@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# cluster-status fetch — runs four kubectl calls in parallel and stashes
-# stdout/stderr/rc under $tmp/<key>.{json,err,rc}. The caller decides how to
-# surface failures; any non-zero rc or empty stdout is not re-run.
+# cluster-status fetch — runs four kubectl calls and stashes stdout/stderr/rc
+# under $tmp/<key>.{json,err,rc}. The caller decides how to surface failures;
+# any non-zero rc or empty stdout is not re-run.
 
 # fetch_all <tmp> <context> <namespace>
 #   <tmp>       — existing directory, owned by caller; cleanup is external.
@@ -14,12 +14,10 @@ fetch_all() {
   cluster_args="$(build_kubectl_args "$context" "" cluster)"
   namespaced_args="$(build_kubectl_args "$context" "$namespace" namespaced)"
 
-  _fetch_one "$tmp/nodes"     kubectl get nodes $cluster_args -o json &
-  _fetch_one "$tmp/pods"      kubectl get pods $namespaced_args -o json &
-  _fetch_one "$tmp/workloads" kubectl get deployments,statefulsets,daemonsets $namespaced_args -o json &
-  _fetch_one "$tmp/pdbs"      kubectl get poddisruptionbudgets $namespaced_args -o json &
-
-  wait
+  _fetch_one "$tmp/nodes"     kubectl get nodes $cluster_args -o json
+  _fetch_one "$tmp/pods"      kubectl get pods $namespaced_args -o json
+  _fetch_one "$tmp/workloads" kubectl get deployments,statefulsets,daemonsets $namespaced_args -o json
+  _fetch_one "$tmp/pdbs"      kubectl get poddisruptionbudgets $namespaced_args -o json
 }
 
 # _fetch_one <prefix> <cmd...>
