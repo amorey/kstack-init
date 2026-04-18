@@ -10,9 +10,9 @@ setup() {
   mkdir -p "$FAKE_ROOT/src/bin" "$FAKE_ROOT/src/lib" \
            "$FAKE_ROOT/src/skills/demo" "$FAKE_ROOT/src/skills/_partials"
 
-  cp "$CHECKOUT_ROOT/install" "$FAKE_ROOT/install"
-  cp "$REPO_ROOT/lib/agents.sh" "$FAKE_ROOT/src/lib/agents.sh"
-  cp "$REPO_ROOT/lib/cache.sh" "$FAKE_ROOT/src/lib/cache.sh"
+  cp "$REPO_ROOT/install" "$FAKE_ROOT/install"
+  cp "$SRC_ROOT/lib/agents.sh" "$FAKE_ROOT/src/lib/agents.sh"
+  cp "$SRC_ROOT/lib/cache.sh" "$FAKE_ROOT/src/lib/cache.sh"
   cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/src/skills/demo/SKILL.md.tmpl"
   cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/src/skills/_partials/global-flags.md"
   cp "$FIXTURES_DIR/skills/_partials/update-check.md" "$FAKE_ROOT/src/skills/_partials/update-check.md"

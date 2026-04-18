@@ -1,15 +1,15 @@
 # shellcheck shell=bash
-# shellcheck disable=SC2034  # vars like REPO_ROOT/CHECKOUT_ROOT/FIXTURES_DIR are consumed by tests that source this file.
+# shellcheck disable=SC2034  # vars like SRC_ROOT/REPO_ROOT/FIXTURES_DIR are consumed by tests that source this file.
 # Shared helpers for the kstack bats suite.
 #
 # Each test's setup() should call common_setup to isolate HOME in a tmpdir.
 
 TEST_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# REPO_ROOT points at src/ — the source tree root that holds lib/, bin/,
-# skills/, scripts/ etc. CHECKOUT_ROOT is the actual repo top, one level up,
+# SRC_ROOT points at src/ — the source tree root that holds lib/, bin/,
+# skills/, scripts/ etc. REPO_ROOT is the actual repo top, one level up,
 # where the user-facing install script and README.md live.
-REPO_ROOT="$(cd "$TEST_HELPER_DIR/.." && pwd)"
-CHECKOUT_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
+SRC_ROOT="$(cd "$TEST_HELPER_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SRC_ROOT/.." && pwd)"
 FIXTURES_DIR="$TEST_HELPER_DIR/fixtures"
 
 common_setup() {

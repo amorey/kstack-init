@@ -5,7 +5,7 @@
 setup() {
   load '../test_helper.bash'
   common_setup
-  . "$REPO_ROOT/lib/cache.sh"
+  . "$SRC_ROOT/lib/cache.sh"
 }
 
 @test "resolve_cache_paths: global mode points at ~/.config/kstack/cache" {

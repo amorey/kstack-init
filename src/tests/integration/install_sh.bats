@@ -58,7 +58,7 @@ exec \"\$REAL_GIT\" \"\${args[@]}\"
 }
 
 @test "scripts/install.sh clones bare repo at resolved tag and execs install" {
-  run "$REPO_ROOT/scripts/install.sh"
+  run "$SRC_ROOT/scripts/install.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--global"* ]]
   [ -d "$HOME/.config/kstack/upstream/.git" ]
@@ -66,15 +66,15 @@ exec \"\$REAL_GIT\" \"\${args[@]}\"
 
 @test "scripts/install.sh exits 1 when GitHub API yields no tag" {
   write_stub curl 'echo "{}"; exit 0'
-  run "$REPO_ROOT/scripts/install.sh"
+  run "$SRC_ROOT/scripts/install.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Could not resolve latest kstack release"* ]]
 }
 
 @test "scripts/install.sh updates existing checkout on rerun" {
-  run "$REPO_ROOT/scripts/install.sh"
+  run "$SRC_ROOT/scripts/install.sh"
   [ "$status" -eq 0 ]
-  run "$REPO_ROOT/scripts/install.sh"
+  run "$SRC_ROOT/scripts/install.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--global"* ]]
 }

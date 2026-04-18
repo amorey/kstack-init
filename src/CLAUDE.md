@@ -73,6 +73,6 @@ An install materializes `{{ROOT_DIR}}/{bin,lib,cache,state,install.conf}` — `~
 - `src/tests/evals/` — skill evaluation scenarios. Each `scenarios/<id>/` is a self-contained package: `scenario.yaml` (metadata + claude flags), `fixture.yaml` (kubectl manifests), `prompt.txt` (user turn), `expected.yaml` (keyword/structured/judge rubric), optional `wait.sh`. Runner libs live under `src/tests/evals/lib/` and are driven by `src/scripts/test-evals.sh`. Artifacts (transcripts, judge outputs, state snapshots) land under `src/tests/evals/artifacts/<id>/` and are gitignored. See `src/tests/evals/README.md` for the full authoring guide.
 - `src/tests/fixtures/` — minimal skill + partial fixtures used by integration tests (so tests aren't coupled to real skill contents).
 
-The bats helper `src/tests/test_helper.bash` exposes two root vars: `REPO_ROOT` resolves to `src/` (the source tree root — tests reference it as `$REPO_ROOT/lib/…`, `$REPO_ROOT/bin/…`, etc.), and `CHECKOUT_ROOT` resolves to the actual repo top, where the user-facing `install` script lives.
+The bats helper `src/tests/test_helper.bash` exposes two root vars: `SRC_ROOT` resolves to `src/` (the source tree root — tests reference it as `$SRC_ROOT/lib/…`, `$SRC_ROOT/bin/…`, etc.), and `REPO_ROOT` resolves to the actual repo top, where the user-facing `install` script lives.
 
 When adding a helper under `src/bin/` or a partial under `src/skills/_partials/`, add a test that exercises it through `install`, not just via direct invocation — the rendering pipeline is where most regressions land.

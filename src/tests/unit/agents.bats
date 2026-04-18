@@ -3,7 +3,7 @@
 setup() {
   load '../test_helper.bash'
   common_setup
-  . "$REPO_ROOT/lib/agents.sh"
+  . "$SRC_ROOT/lib/agents.sh"
 }
 
 @test "agent_cli maps claude to claude" {

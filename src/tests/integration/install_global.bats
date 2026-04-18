@@ -18,9 +18,9 @@ setup() {
 
     mkdir -p src/bin src/lib src/skills/demo/scripts src/skills/_partials
     # Install script at repo root — mirrors the real repo layout.
-    cp "$CHECKOUT_ROOT/install" install
-    cp "$REPO_ROOT/lib/agents.sh" src/lib/agents.sh
-    cp "$REPO_ROOT/lib/cache.sh" src/lib/cache.sh
+    cp "$REPO_ROOT/install" install
+    cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
+    cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
     cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
     cp "$FIXTURES_DIR/skills/_partials/update-check.md" src/skills/_partials/update-check.md
@@ -45,7 +45,7 @@ EOF
 
   # install script under test: the one in the bare-repo-cloned source.
   # Run the in-repo one — it will ensure_src_checkout from our local bare repo.
-  RUN_INSTALL="$CHECKOUT_ROOT/install"
+  RUN_INSTALL="$REPO_ROOT/install"
   export KSTACK_REMOTE_URL="$BARE"
 }
 

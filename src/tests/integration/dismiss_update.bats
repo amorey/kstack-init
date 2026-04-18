@@ -6,8 +6,8 @@ setup() {
 
   # Stage a global install layout so dismiss-update targets $HOME/.config/kstack/cache.
   mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/cache" "$HOME/.config/kstack/lib"
-  cp "$REPO_ROOT/bin/dismiss-update" "$HOME/.config/kstack/bin/dismiss-update"
-  cp "$REPO_ROOT/lib/cache.sh" "$HOME/.config/kstack/lib/cache.sh"
+  cp "$SRC_ROOT/bin/dismiss-update" "$HOME/.config/kstack/bin/dismiss-update"
+  cp "$SRC_ROOT/lib/cache.sh" "$HOME/.config/kstack/lib/cache.sh"
   chmod +x "$HOME/.config/kstack/bin/dismiss-update"
   CACHE_FILE="$HOME/.config/kstack/cache/update.json"
 }

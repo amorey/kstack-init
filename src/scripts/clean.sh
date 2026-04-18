@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Paths the repo-local install (and older versions of it) can write into.
 # Keep this list in sync with .gitignore.
@@ -29,7 +29,7 @@ PATHS="
 main() {
   removed=0
   for p in $PATHS; do
-    full="$REPO_ROOT/$p"
+    full="$SRC_ROOT/$p"
     if [ -e "$full" ]; then
       rm -rf "$full"
       echo "removed $p"

@@ -7,7 +7,7 @@ setup() {
   # Stage a fake repo with the script + some artifacts to clean.
   FAKE_REPO="$TMPDIR_TEST/fake-repo"
   mkdir -p "$FAKE_REPO/scripts"
-  cp "$REPO_ROOT/scripts/clean.sh" "$FAKE_REPO/scripts/clean.sh"
+  cp "$SRC_ROOT/scripts/clean.sh" "$FAKE_REPO/scripts/clean.sh"
   chmod +x "$FAKE_REPO/scripts/clean.sh"
 }
 

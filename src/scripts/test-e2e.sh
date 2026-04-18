@@ -8,7 +8,7 @@
 # Requires: bats-core, kind, kubectl, docker.
 set -eu
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 if ! command -v bats >/dev/null 2>&1; then
   echo "bats not found. Install with:" >&2
@@ -17,4 +17,4 @@ if ! command -v bats >/dev/null 2>&1; then
   exit 1
 fi
 
-exec bats "$REPO_ROOT/tests/e2e"
+exec bats "$SRC_ROOT/tests/e2e"

@@ -6,8 +6,8 @@ setup() {
 
   # Stage a fake global install: config dir, lib, bin, some kstack-* skill dirs.
   mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/lib"
-  cp "$REPO_ROOT/bin/uninstall" "$HOME/.config/kstack/bin/uninstall"
-  cp "$REPO_ROOT/lib/agents.sh" "$HOME/.config/kstack/lib/agents.sh"
+  cp "$SRC_ROOT/bin/uninstall" "$HOME/.config/kstack/bin/uninstall"
+  cp "$SRC_ROOT/lib/agents.sh" "$HOME/.config/kstack/lib/agents.sh"
   chmod +x "$HOME/.config/kstack/bin/uninstall"
 
   mkdir -p "$HOME/.claude/skills/kstack-demo" "$HOME/.claude/skills/kstack-other"
@@ -64,8 +64,8 @@ setup() {
 @test "uninstall exits 1 when not invoked from ~/.config/kstack/bin" {
   local elsewhere="$TMPDIR_TEST/elsewhere/bin"
   mkdir -p "$elsewhere" "$TMPDIR_TEST/elsewhere/lib"
-  cp "$REPO_ROOT/bin/uninstall" "$elsewhere/uninstall"
-  cp "$REPO_ROOT/lib/agents.sh" "$TMPDIR_TEST/elsewhere/lib/agents.sh"
+  cp "$SRC_ROOT/bin/uninstall" "$elsewhere/uninstall"
+  cp "$SRC_ROOT/lib/agents.sh" "$TMPDIR_TEST/elsewhere/lib/agents.sh"
   chmod +x "$elsewhere/uninstall"
 
   run "$elsewhere/uninstall" --force

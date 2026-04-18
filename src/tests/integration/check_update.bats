@@ -7,8 +7,8 @@ setup() {
   # Global-mode install layout: check-update lives at $HOME/.config/kstack/bin,
   # libs alongside at $HOME/.config/kstack/lib.
   mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/cache" "$HOME/.config/kstack/lib"
-  cp "$REPO_ROOT/bin/check-update" "$HOME/.config/kstack/bin/check-update"
-  cp "$REPO_ROOT/lib/cache.sh" "$HOME/.config/kstack/lib/cache.sh"
+  cp "$SRC_ROOT/bin/check-update" "$HOME/.config/kstack/bin/check-update"
+  cp "$SRC_ROOT/lib/cache.sh" "$HOME/.config/kstack/lib/cache.sh"
   chmod +x "$HOME/.config/kstack/bin/check-update"
   CACHE_FILE="$HOME/.config/kstack/cache/update.json"
   CHECK="$HOME/.config/kstack/bin/check-update"

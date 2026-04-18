@@ -8,7 +8,7 @@ setup() {
 @test "upgrade in global location execs upstream/install --global" {
   # Stage a fake global install.
   mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/upstream"
-  cp "$REPO_ROOT/bin/upgrade" "$HOME/.config/kstack/bin/upgrade"
+  cp "$SRC_ROOT/bin/upgrade" "$HOME/.config/kstack/bin/upgrade"
   chmod +x "$HOME/.config/kstack/bin/upgrade"
   cat > "$HOME/.config/kstack/upstream/install" <<'EOF'
 #!/usr/bin/env bash
@@ -38,7 +38,7 @@ EOF
 echo "LOCAL-INSTALL:$*"
 EOF
     chmod +x install
-    cp "$REPO_ROOT/bin/upgrade" .kstack/bin/upgrade
+    cp "$SRC_ROOT/bin/upgrade" .kstack/bin/upgrade
     chmod +x .kstack/bin/upgrade
     git add -A
     git commit --quiet -m "init"

@@ -5,7 +5,7 @@
 setup() {
   load '../test_helper.bash'
   common_setup
-  . "$REPO_ROOT/bin/check-update"
+  . "$SRC_ROOT/bin/check-update"
 }
 
 @test "is_newer: equal versions returns 1" {
