@@ -350,12 +350,14 @@ Outdated cluster components, known CVEs, and available version bumps.
 
 Remove all kstack-managed resources from the cluster.
 
-**What it removes:** anything labeled `kstack.kubetail.com/owned-by=true` — ephemeral debug containers from `/exec`, pod clones created with `--copy-to`, watcher Jobs and ConfigMaps from `/watch`, toolbox pods, and any temporary RBAC bindings kstack created for them. Resources you authored by hand are never touched, even if they live in the same namespace.
+**What it removes:** anything labeled `kstack.kubetail.com/owned-by=kstack` — ephemeral debug containers from `/exec`, pod clones created with `--copy-to`, watcher Jobs and ConfigMaps from `/watch`, toolbox pods, and any temporary RBAC bindings kstack created for them. Resources you authored by hand are never touched, even if they live in the same namespace.
 
 **Labels kstack writes** on every resource it creates (these power the filter flags below):
-- `kstack.kubetail.com/owned-by=true` — the cleanup selector; presence of this label is what makes a resource a candidate
+- `kstack.kubetail.com/owned-by=kstack` — the cleanup selector; presence of this label is what makes a resource a candidate
 - `kstack.kubetail.com/skill=<exec|watch|...>` — which kstack skill created the resource (powers `--skill`)
 - `kstack.kubetail.com/session=<id>` — the Claude Code session that created it (powers `--session` / `--this-session`)
+
+**Annotations kstack writes** (non-selectable metadata read client-side after the label selector narrows the candidate set):
 - `kstack.kubetail.com/created-at=<rfc3339>` — creation timestamp written by kstack itself, since `metadata.creationTimestamp` can be rewritten by admission controllers (powers `--older-than`)
 
 **How it works:** a single label-selector `kubectl get` across all namespaces builds the candidate list. Claude prints the full list (kind/namespace/name + age + session) and waits for confirmation before issuing deletes. Deletes run with `--wait=false` so a single stuck finalizer can't block the rest of the cleanup; anything that fails to terminate is reported back so you can intervene.
