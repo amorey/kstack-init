@@ -8,13 +8,14 @@ kstack is a **skill pack** (not an app) distributed to Claude Code and other age
 
 ## Commands
 
-- `./scripts/test.sh` — run the full bats suite (`tests/unit` + `tests/integration`). Requires `bats-core` (`brew install bats-core` / `apt install bats`).
+- `./scripts/test.sh` — run the fast bats tiers (`tests/unit` + `tests/integration`). Requires `bats-core` (`brew install bats-core` / `apt install bats`). Pass `--all` to also run the e2e tier.
+- `./scripts/test-e2e.sh` — run the cluster-backed tier against a kind cluster named `kstack-test`. The fixture is managed by `tests/e2e/setup_suite.bash`; no prior `kind` state is required. Set `KSTACK_REUSE_CLUSTER=1` during dev loops to keep the cluster alive across runs. Requires `kind`, `kubectl`, and a running Docker daemon.
 - `bats tests/unit/<file>.bats` — run a single test file. Use `bats -f "<name pattern>" …` to run one test.
 - `./install` — render skills into `<repo>/.<agent>/skills/…` for every agent CLI detected on `PATH` (repo-local mode).
 - `./install --global` — clone/update `~/.config/kstack/src/` at the latest release tag and render into `~/.<agent>/skills/kstack-<skill>/…`. Do **not** use the invoker's checkout as the source in global mode; it always pulls canonical upstream.
 - `./scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
 
-CI (`.github/workflows/ci.yml`) runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR.
+CI (`.github/workflows/ci.yml`) runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. A separate `bats-e2e` job runs `scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check.
 
 ## Architecture
 
@@ -53,6 +54,7 @@ Per-context cache + learned state live under `~/.config/kstack/{cache,state}/` (
 
 - `tests/unit/` — sourced-function tests (e.g. `agents.bats` sources `lib/agents.sh`).
 - `tests/integration/` — end-to-end CLI tests that build a fake kstack checkout under `$BATS_TEST_TMPDIR` and run `install` against it with an isolated `$HOME`. See `tests/test_helper.bash` (`common_setup`, `use_mocks`, `write_stub`).
+- `tests/e2e/` — cluster-backed tests. `tests/e2e/setup_suite.bash` owns the kind cluster lifecycle via bats' `setup_suite`/`teardown_suite` hooks; tests inherit `KUBECONFIG` and talk to the cluster directly. Only fires under `scripts/test-e2e.sh` — never under `scripts/test.sh`.
 - `tests/fixtures/` — minimal skill + partial fixtures used by integration tests (so tests aren't coupled to real skill contents).
 
 When adding a helper under `bin/` or a partial under `skills/_partials/`, add a test that exercises it through `install`, not just via direct invocation — the rendering pipeline is where most regressions land.
