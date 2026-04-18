@@ -6,7 +6,7 @@ Every kstack skill accepts these flags. Parse them off the invocation before han
 - `--namespace <n>` (alias `-n`) — Append `-n <n>` (or `--namespace=<n>`) to every kubectl/kubetail call, and skip any `--all-namespaces` default the skill would otherwise use.
 - `--json` — Emit a single structured JSON object instead of prose. Schema is defined per-skill; do not mix prose and JSON in the same run.
 - `--dry-run` — Do not execute commands. For each command the skill would run, print `# would run: <command>` and continue. End with "Dry run — no commands executed." No partial execution.
-- `--help` — Run `cat {{HELP_PATH}}` and end the turn. The file's last line is the literal sentinel `=== END HELP ===` — as soon as you see that line in the tool result, stop: no summary, no restatement, no further commands.
+- `--help` — Run `cat {{SKILL_DIR}}/references/help.md` and end the turn. The file's last line is the literal sentinel `=== END HELP ===` — as soon as you see that line in the tool result, stop: no summary, no restatement, no further commands.
 
 ### Unknown or missing arguments
 

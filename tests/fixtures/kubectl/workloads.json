@@ -1,0 +1,36 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "kind": "Deployment",
+      "metadata": {"name": "web", "namespace": "default"},
+      "spec": {"replicas": 3},
+      "status": {"readyReplicas": 1}
+    },
+    {
+      "kind": "Deployment",
+      "metadata": {"name": "healthy-dep", "namespace": "default"},
+      "spec": {"replicas": 2},
+      "status": {"readyReplicas": 2}
+    },
+    {
+      "kind": "StatefulSet",
+      "metadata": {"name": "db", "namespace": "data"},
+      "spec": {"replicas": 3},
+      "status": {"readyReplicas": 3}
+    },
+    {
+      "kind": "DaemonSet",
+      "metadata": {"name": "node-exporter", "namespace": "monitoring"},
+      "spec": {},
+      "status": {"numberReady": 2, "desiredNumberScheduled": 3}
+    },
+    {
+      "kind": "DaemonSet",
+      "metadata": {"name": "fluent-bit", "namespace": "monitoring"},
+      "spec": {},
+      "status": {"numberReady": 3, "desiredNumberScheduled": 3}
+    }
+  ]
+}

@@ -15,8 +15,8 @@ setup() {
 }
 
 render() {
-  local help_path="${5:-/install/path/references/help.md}"
-  render_skill "$1" "$2" "$3" "$4" "$help_path" "$OUT" "$SKILLS_SRC" "$GF" "$UC"
+  local skill_dir="${5:-/install/path}"
+  render_skill "$1" "$2" "$3" "$4" "$skill_dir" "$OUT" "$SKILLS_SRC" "$GF" "$UC"
 }
 
 render_h() {
@@ -35,9 +35,9 @@ render_h() {
   grep -F "bin_dir: /my/bin" "$OUT"
 }
 
-@test "render_skill substitutes HELP_PATH" {
-  render demo claude /root /bin /skills/demo/references/help.md
-  grep -F "help_path: /skills/demo/references/help.md" "$OUT"
+@test "render_skill substitutes SKILL_DIR" {
+  render demo claude /root /bin /skills/demo
+  grep -F "skill_dir: /skills/demo" "$OUT"
 }
 
 @test "render_skill inlines both partials" {

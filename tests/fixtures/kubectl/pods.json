@@ -1,0 +1,82 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "kind": "Pod",
+      "metadata": {"name": "web-abc", "namespace": "default"},
+      "spec": {"nodeName": "cp-1"},
+      "status": {
+        "phase": "Running",
+        "startTime": "2026-04-18T11:58:00Z",
+        "containerStatuses": [
+          {"name": "web", "restartCount": 0, "state": {"running": {}}}
+        ]
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {"name": "pending-old", "namespace": "batch"},
+      "spec": {},
+      "status": {
+        "phase": "Pending",
+        "startTime": "2026-04-18T11:40:00Z"
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {"name": "crash-warn", "namespace": "default"},
+      "spec": {"nodeName": "worker-mem"},
+      "status": {
+        "phase": "Running",
+        "startTime": "2026-04-18T11:30:00Z",
+        "containerStatuses": [
+          {"name": "app", "restartCount": 3,
+           "state": {"waiting": {"reason": "CrashLoopBackOff", "message": "back-off 40s"}}}
+        ]
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {"name": "crash-crit", "namespace": "payments"},
+      "spec": {"nodeName": "worker-mem"},
+      "status": {
+        "phase": "Running",
+        "startTime": "2026-04-18T10:00:00Z",
+        "containerStatuses": [
+          {"name": "worker", "restartCount": 12,
+           "state": {"waiting": {"reason": "CrashLoopBackOff", "message": "back-off 5m"}}}
+        ]
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {"name": "oom-app", "namespace": "default"},
+      "spec": {"nodeName": "worker-mem"},
+      "status": {
+        "phase": "Running",
+        "startTime": "2026-04-18T11:00:00Z",
+        "containerStatuses": [
+          {"name": "api", "restartCount": 1,
+           "state": {"running": {}},
+           "lastState": {"terminated": {"reason": "OOMKilled", "exitCode": 137,
+                                        "finishedAt": "2026-04-18T11:50:00Z"}}}
+        ]
+      }
+    },
+    {
+      "kind": "Pod",
+      "metadata": {"name": "image-pull", "namespace": "ops"},
+      "spec": {"nodeName": "cp-1"},
+      "status": {
+        "phase": "Pending",
+        "startTime": "2026-04-18T11:55:00Z",
+        "containerStatuses": [
+          {"name": "sidecar", "restartCount": 0,
+           "state": {"waiting": {"reason": "ImagePullBackOff",
+                                 "message": "Back-off pulling image \"repo/foo:v9\""}}}
+        ]
+      }
+    }
+  ]
+}

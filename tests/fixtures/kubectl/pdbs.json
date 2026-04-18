@@ -1,0 +1,16 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "kind": "PodDisruptionBudget",
+      "metadata": {"name": "web", "namespace": "default"},
+      "status": {"currentHealthy": 1, "desiredHealthy": 3}
+    },
+    {
+      "kind": "PodDisruptionBudget",
+      "metadata": {"name": "db", "namespace": "data"},
+      "status": {"currentHealthy": 3, "desiredHealthy": 3}
+    }
+  ]
+}

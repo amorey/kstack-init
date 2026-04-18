@@ -16,7 +16,7 @@ setup() {
     git config user.email "test@example.com"
     git config user.name "Test"
 
-    mkdir -p bin lib skills/demo skills/_partials
+    mkdir -p bin lib skills/demo/scripts skills/_partials
     cp "$REPO_ROOT/install" install
     cp "$REPO_ROOT/lib/agents.sh" lib/agents.sh
     cp "$REPO_ROOT/lib/cache.sh" lib/cache.sh
@@ -28,7 +28,11 @@ setup() {
 #!/usr/bin/env bash
 echo hello
 EOF
-    chmod +x bin/hello install
+    cat > skills/demo/scripts/snapshot <<'EOF'
+#!/usr/bin/env bash
+echo snap
+EOF
+    chmod +x bin/hello install skills/demo/scripts/snapshot
     git add -A
     git commit --quiet -m "init"
     git branch -M main
@@ -61,6 +65,19 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F "bin_dir: $HOME/.config/kstack/bin" "$HOME/.claude/skills/kstack-demo/SKILL.md"
   [ "$status" -eq 0 ]
+}
+
+@test "install --global substitutes SKILL_DIR to the rendered slot path" {
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run grep -F "skill_dir: $HOME/.claude/skills/kstack-demo" "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "install --global copies skills/<name>/scripts/ into rendered slot" {
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$HOME/.claude/skills/kstack-demo/scripts/snapshot" ]
 }
 
 @test "install --global copies bin/ helpers to \$HOME/.config/kstack/bin" {

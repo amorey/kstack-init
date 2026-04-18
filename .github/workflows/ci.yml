@@ -20,7 +20,8 @@ jobs:
           shellcheck --severity=warning --external-sources \
             install \
             bin/check-update bin/dismiss-update bin/uninstall bin/upgrade \
-            lib/*.sh scripts/*.sh \
+            lib/*.sh lib/*/*.sh scripts/*.sh \
+            skills/cluster-status/scripts/snapshot \
             tests/test_helper.bash
 
   bats:
@@ -64,18 +65,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install bats-core (Ubuntu)
+      - name: Install bats-core + jq (Ubuntu)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y bats
+        run: sudo apt-get update && sudo apt-get install -y bats jq
 
-      - name: Install bats-core (macOS)
+      - name: Install bats-core + jq (macOS)
         if: runner.os == 'macOS'
-        run: brew install bats-core
+        run: brew install bats-core jq
 
       - name: Install bats-core (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: npm install -g bats
+
+      - name: Install jq (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: choco install jq -y
 
       - name: Configure git identity
         run: |

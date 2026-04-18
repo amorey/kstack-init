@@ -169,10 +169,10 @@ EOF
   [[ "$output" == *"=== END HELP ==="* ]]
 }
 
-@test "SKILL.md help_path placeholder resolves to absolute help.md path" {
+@test "SKILL.md skill_dir placeholder resolves to rendered slot path" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "help_path: $FAKE_ROOT/.claude/skills/demo/references/help.md" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  run grep -F "skill_dir: $FAKE_ROOT/.claude/skills/demo" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
@@ -212,4 +212,50 @@ EOF
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+}
+
+@test "install copies skills/<name>/scripts/ into rendered slot as executable" {
+  mkdir -p "$FAKE_ROOT/skills/demo/scripts"
+  cat > "$FAKE_ROOT/skills/demo/scripts/snapshot" <<'EOF'
+#!/usr/bin/env bash
+echo snap
+EOF
+  chmod +x "$FAKE_ROOT/skills/demo/scripts/snapshot"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
+}
+
+@test "install omits scripts/ slot when source skill has no scripts dir" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts" ]
+}
+
+@test "install prunes stale scripts/ slot when source dir is removed" {
+  mkdir -p "$FAKE_ROOT/skills/demo/scripts"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/skills/demo/scripts/snapshot"
+  chmod +x "$FAKE_ROOT/skills/demo/scripts/snapshot"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
+  rm -rf "$FAKE_ROOT/skills/demo/scripts"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts" ]
+}
+
+@test "install prunes orphan scripts when source dir shrinks" {
+  mkdir -p "$FAKE_ROOT/skills/demo/scripts"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/skills/demo/scripts/snapshot"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/skills/demo/scripts/extra"
+  chmod +x "$FAKE_ROOT/skills/demo/scripts/snapshot" "$FAKE_ROOT/skills/demo/scripts/extra"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/extra" ]
+  rm "$FAKE_ROOT/skills/demo/scripts/extra"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
+  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts/extra" ]
 }

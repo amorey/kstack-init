@@ -4,6 +4,7 @@ description: Health snapshot (pod restarts, node conditions, resource pressure)
 agent: {{AGENT}}
 install_root: {{ROOT_DIR}}
 bin_dir: {{BIN_DIR}}
+skill_dir: {{SKILL_DIR}}
 ---
 
 {{UPDATE_CHECK}}
@@ -12,7 +13,7 @@ bin_dir: {{BIN_DIR}}
 
 ## Purpose
 
-Produce a single dense health snapshot of the cluster covering nodes, pods, workloads, and disruption budgets. Read-only — never mutate cluster state.
+Produce a single dense health snapshot of the cluster covering nodes, pods, workloads, and disruption budgets. Read-only — never mutates cluster state.
 
 ## Arguments
 
@@ -20,105 +21,13 @@ This skill takes no positional arguments. If the user supplies one, respond with
 
 ## Skill flags
 
-- `--since <duration>` — Only flag issues observed in the last N (e.g. `5m`, `1h`, `24h`). Applied client-side using condition `lastTransitionTime`, container `state.terminated.finishedAt`, and pod `status.startTime`. Default: no time filter.
+- `--since <duration>` — Only flag issues observed in the last N (e.g. `5m`, `1h`, `24h`). Default: no time filter.
 - `--severity <critical|warning|info>` — Filter output to findings at or above the given severity. Default: include all.
 
 ## Workflow
 
-Run these four `kubectl` calls in parallel (one tool-use message, four commands). Honor the global flags: append `--context=<ctx>` when `--context` is set; replace `--all-namespaces` with `-n <ns>` when `--namespace` is set.
+Run `KSTACK_ROOT="{{ROOT_DIR}}" {{SKILL_DIR}}/scripts/snapshot` exactly once, forwarding every user-supplied flag verbatim. The script owns the full aggregation (kubectl fanout, severity scoring, rendering) and returns finished output on stdout.
 
-1. `kubectl get nodes -o json`
-2. `kubectl get pods --all-namespaces -o json`
-3. `kubectl get deployments,statefulsets,daemonsets --all-namespaces -o json`
-4. `kubectl get poddisruptionbudgets --all-namespaces -o json`
+Display stdout verbatim — no edits, no restructuring, no added commentary. If the user passed `--json`, wrap the body in a ```json fenced block; otherwise print as-is. Do not run additional kubectl calls — the script owns the full snapshot. Route follow-up questions to `/investigate <kind>/<namespace>/<name>`.
 
-Aggregate client-side. Do not issue per-resource follow-up calls — resource-level deep dives belong in `/investigate`.
-
-If a call fails (RBAC, timeout), continue with the rest and surface the failure as an `errors` entry (JSON mode) or a trailing `Errors:` line (prose mode). Never retry silently.
-
-### What to compute
-
-**Nodes**
-- `status.conditions[type=Ready].status != True` → NotReady
-- `MemoryPressure`, `DiskPressure`, or `PIDPressure` condition is `True`
-- `spec.unschedulable == true` (cordoned)
-
-**Pods**
-- Phase distribution: counts of `Pending`, `Running`, `Succeeded`, `Failed`, `Unknown`
-- `Pending` pods with no `spec.nodeName` for > 2m → unschedulable
-- `containerStatuses[*].state.waiting.reason` in `{CrashLoopBackOff, ImagePullBackOff, ErrImagePull, CreateContainerConfigError}`
-- `containerStatuses[*].lastState.terminated.reason == OOMKilled`
-- `containerStatuses[*].restartCount > 0` (grouped by workload owner via `metadata.ownerReferences`)
-
-**Workloads**
-- Deployment / StatefulSet: `status.readyReplicas < spec.replicas`
-- DaemonSet: `status.numberReady < status.desiredNumberScheduled`
-
-**PDBs**
-- `status.currentHealthy < status.desiredHealthy` → violation
-
-### Severity rubric
-
-- **critical** — Node NotReady; pod OOMKilled; CrashLoopBackOff with > 5 restarts; PDB violation; unschedulable pod > 10m.
-- **warning** — MemoryPressure / DiskPressure / PIDPressure; ImagePullBackOff / ErrImagePull; replica drift; CrashLoopBackOff ≤ 5 restarts; cordoned node with running workloads.
-- **info** — Phase distribution and healthy totals. Emitted for orientation even when there are no problems.
-
-One finding per distinct problem per resource — do not double-count (e.g. a CrashLoopBackOff pod with 8 restarts produces one critical finding, not two).
-
-## Output
-
-### Prose (default)
-
-1. Headline: `<N> findings — <C> critical, <W> warning, <I> info` followed by the context and namespace scope.
-2. **Nodes (`<N>`) table** — one row per node observed, always rendered. Substitute `<N>` with the total node count (e.g. `Nodes (5)`):
-
-   | Node | Role | MemPressure | DiskPressure | PIDPressure | Ready | Schedulable | Notes |
-
-   `Role` is derived from `node-role.kubernetes.io/*` labels (`control-plane` or `worker`). Use `✓` / `✗` for boolean conditions (✓ = healthy — pressures false, Ready true, Schedulable true), `—` when unknown. `Notes` holds the highest-severity finding for that node (e.g. `critical: NotReady 8m`) or blank if healthy.
-
-3. **Workloads table** — one row per pod/workload finding, skip healthy ones:
-
-   | Severity | Kind | Namespace | Name | Reason | Detail |
-
-4. **PDBs table** — only rendered if any violations exist:
-
-   | Namespace | Name | Desired | Healthy | Detail |
-
-5. Pod phase summary as a single inline line: `Pods: 142 Running · 3 Pending · 1 Failed` (omit zero-count phases).
-6. Single next-step hint: `→ /investigate <kind>/<name>` for the highest-severity finding.
-
-Rows in the Workloads and PDBs tables are sorted critical → warning → info, then by namespace/name. Omit the Workloads or PDBs table entirely when it has no rows. On repeat runs within the same conversation, diff against the previous snapshot held in conversation context and prepend a `Δ` column to each table marking `+` (new), `−` (resolved), `~` (severity changed); prefix the headline with `Δ`. If nothing changed, say so in one line and skip the tables.
-
-### JSON (`--json`)
-
-Emit exactly one object. No prose, no extra keys, no trailing commentary.
-
-```json
-{
-  "context": "<kubecontext-name>",
-  "namespace": "<ns-or-null>",
-  "checked_at": "<rfc3339-timestamp>",
-  "summary": { "critical": 0, "warning": 0, "info": 0 },
-  "pod_phases": { "Running": 0, "Pending": 0, "Succeeded": 0, "Failed": 0, "Unknown": 0 },
-  "findings": [
-    {
-      "severity": "critical|warning|info",
-      "category": "node|pod|workload|pdb",
-      "kind": "Node|Pod|Deployment|StatefulSet|DaemonSet|PodDisruptionBudget",
-      "namespace": "<ns-or-null>",
-      "name": "<resource-name>",
-      "reason": "<short-machine-code>",
-      "detail": "<one-line-human-readable-fact>"
-    }
-  ],
-  "errors": []
-}
-```
-
-`reason` values are stable identifiers (e.g. `NotReady`, `MemoryPressure`, `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, `Unschedulable`, `ReplicaDrift`, `PDBViolation`, `PhaseSummary`). `detail` is free-form prose for humans. Omit `namespace` (null) for cluster-scoped resources.
-
-## Constraints
-
-- Read-only. Never run `kubectl apply|delete|patch|edit|replace|create|exec`, nor fetch logs. Route those to `/exec` and `/logs`.
-- Do not fan out to per-pod or per-namespace follow-up calls in this skill — four API calls total is the budget.
-- Never invent findings for resources you have not observed. If a call failed, the resulting gap appears in `errors`, not in `findings`.
+If the script exits non-zero, display its stderr verbatim and stop.
