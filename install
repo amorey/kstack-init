@@ -96,27 +96,21 @@ render_skill() {
       -v install_root="$install_root" -v bin_dir="$bin_dir" \
       -v help_path="$help_path" \
       -v skill="$skill" -v agent="$agent" '
+    function subst(s) {
+      gsub(/\{\{INSTALL_ROOT\}\}/, install_root, s)
+      gsub(/\{\{BIN_DIR\}\}/,      bin_dir,      s)
+      gsub(/\{\{HELP_PATH\}\}/,    help_path,    s)
+      gsub(/\{\{SKILL_NAME\}\}/,   skill,        s)
+      gsub(/\{\{AGENT\}\}/,        agent,        s)
+      return s
+    }
     function inline(path,    line) {
-      while ((getline line < path) > 0) {
-        gsub(/\{\{INSTALL_ROOT\}\}/, install_root, line)
-        gsub(/\{\{BIN_DIR\}\}/,      bin_dir,      line)
-        gsub(/\{\{HELP_PATH\}\}/,    help_path,    line)
-        gsub(/\{\{SKILL_NAME\}\}/,   skill,        line)
-        gsub(/\{\{AGENT\}\}/,        agent,        line)
-        print line
-      }
+      while ((getline line < path) > 0) print subst(line)
       close(path)
     }
     /\{\{GLOBAL_FLAGS\}\}/ { inline(gf); next }
     /\{\{UPDATE_CHECK\}\}/ { inline(uc); next }
-    {
-      gsub(/\{\{INSTALL_ROOT\}\}/, install_root)
-      gsub(/\{\{BIN_DIR\}\}/,      bin_dir)
-      gsub(/\{\{HELP_PATH\}\}/,    help_path)
-      gsub(/\{\{SKILL_NAME\}\}/,   skill)
-      gsub(/\{\{AGENT\}\}/,        agent)
-      print
-    }
+    { print subst($0) }
   ' "$skills_src/$skill/SKILL.md.tmpl" > "$out_file"
 }
 
@@ -171,8 +165,8 @@ prune_orphans() {
   local dir="$1" glob="$2" keep="$3" label="$4"
   [ -d "$dir" ] || return 0
   local entry base
-  shopt -s nullglob
   for entry in "$dir"/$glob; do
+    [ -e "$entry" ] || continue
     base="${entry##*/}"
     case " $keep " in
       *" $base "*) continue ;;
@@ -180,7 +174,6 @@ prune_orphans() {
     rm -rf "$entry"
     log "    pruned: ${label}${base}"
   done
-  shopt -u nullglob
 }
 
 # install_agent $mode $agent $install_root $bin_dir $skills_dir $slot_prefix
@@ -190,13 +183,13 @@ install_agent() {
   local mode="$1" agent="$2" install_root="$3" bin_dir="$4" skills_dir="$5" slot_prefix="$6"
   mkdir -p "$skills_dir"
 
-  local installed="" keep="" skill out_dir out_file help_file
+  local slots="" skill slot out_dir out_file help_file
   for skill in $SKILL_NAMES; do
-    out_dir="$skills_dir/${slot_prefix}${skill}"
+    slot="${slot_prefix}${skill}"
+    out_dir="$skills_dir/$slot"
     out_file="$out_dir/SKILL.md"
     help_file="$out_dir/references/help.md"
-    # Remove anything blocking the skill slot from being a directory
-    # (stale symlinks on Unix, or leftover files on any platform).
+    # Clear stale symlinks / non-dirs left by a previous install before re-rendering.
     if [ -L "$out_dir" ] || { [ -e "$out_dir" ] && [ ! -d "$out_dir" ]; }; then
       rm -f "$out_dir"
     fi
@@ -206,49 +199,40 @@ install_agent() {
     render_skill "$skill" "$agent" "$install_root" "$bin_dir" "$help_file" "$out_file" \
       "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"
     render_help "$skill" "$SRC_ROOT/README.md" "$help_file"
-    installed="$installed ${slot_prefix}${skill}"
-    keep="$keep ${slot_prefix}${skill}"
+    slots="$slots $slot"
   done
 
   log "  $agent ($mode) → $skills_dir"
-  log "    installed:$installed"
+  log "    installed:$slots"
 
-  # Prune stale slots from prior installs. In global mode the glob is scoped
-  # to kstack-* so we never touch user-owned skills in a shared skills dir;
-  # in local mode the skills dir is install-owned (gitignored), so pruning
-  # any non-matching entry is safe.
-  local prune_glob="*"
-  [ -n "$slot_prefix" ] && prune_glob="${slot_prefix}*"
-  prune_orphans "$skills_dir" "$prune_glob" "${keep# }" ""
+  # Prune stale slots from prior installs. When slot_prefix is "kstack-", the
+  # glob scopes pruning to kstack-* so user-owned skills in a shared skills
+  # dir are never touched; when empty (repo-local), the glob is "*" and the
+  # whole install-owned dir is fair game.
+  prune_orphans "$skills_dir" "${slot_prefix}*" "${slots# }" ""
 }
 
-copy_bin_global() {
-  mkdir -p "$KSTACK_GLOBAL_BIN"
+# sync_dir_global $src $glob $dst $label $executable
+#   Copies $src/$glob → $dst/, then prunes any $glob-matching orphan in $dst.
+#   Skips .gitkeep placeholders. $executable=1 chmods each copy +x.
+sync_dir_global() {
+  local src="$1" glob="$2" dst="$3" label="$4" executable="$5"
+  mkdir -p "$dst"
   local f name keep=""
-  for f in "$BIN_DIR"/*; do
+  for f in "$src"/$glob; do
     [ -e "$f" ] || continue
     name="${f##*/}"
-    # .gitkeep exists only to let git track an otherwise-empty bin/ in fresh checkouts.
     [ "$name" = ".gitkeep" ] && continue
-    cp "$f" "$KSTACK_GLOBAL_BIN/"
-    chmod +x "$KSTACK_GLOBAL_BIN/$name"
+    cp "$f" "$dst/"
+    [ "$executable" = 1 ] && chmod +x "$dst/$name"
     keep="$keep $name"
   done
-  log "  bin/ → $KSTACK_GLOBAL_BIN"
-  prune_orphans "$KSTACK_GLOBAL_BIN" "*" "${keep# }" "bin/"
+  log "  $label → $dst"
+  prune_orphans "$dst" "$glob" "${keep# }" "$label"
 }
 
-copy_lib_global() {
-  mkdir -p "$KSTACK_GLOBAL_LIB"
-  local f keep=""
-  for f in "$SRC_ROOT/lib"/*.sh; do
-    [ -e "$f" ] || continue
-    cp "$f" "$KSTACK_GLOBAL_LIB/"
-    keep="$keep ${f##*/}"
-  done
-  log "  lib/ → $KSTACK_GLOBAL_LIB"
-  prune_orphans "$KSTACK_GLOBAL_LIB" "*.sh" "${keep# }" "lib/"
-}
+copy_bin_global() { sync_dir_global "$BIN_DIR"      '*'    "$KSTACK_GLOBAL_BIN" "bin/" 1; }
+copy_lib_global() { sync_dir_global "$SRC_ROOT/lib" '*.sh' "$KSTACK_GLOBAL_LIB" "lib/" 0; }
 
 main() {
   AGENT=""
