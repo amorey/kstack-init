@@ -128,8 +128,11 @@ install_agent() {
   for skill in $SKILL_NAMES; do
     out_dir="$skills_dir/${slot_prefix}${skill}"
     out_file="$out_dir/SKILL.md"
-    # Replace stale symlinks from earlier layouts.
-    [ -L "$out_dir" ] && rm -f "$out_dir"
+    # Remove anything blocking the skill slot from being a directory
+    # (stale symlinks on Unix, or leftover files on any platform).
+    if [ -L "$out_dir" ] || { [ -e "$out_dir" ] && [ ! -d "$out_dir" ]; }; then
+      rm -f "$out_dir"
+    fi
     [ -L "$out_file" ] && rm -f "$out_file"
     mkdir -p "$out_dir"
     render_skill "$skill" "$agent" "$install_root" "$bin_dir" "$out_file" \

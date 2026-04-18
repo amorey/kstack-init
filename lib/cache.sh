@@ -25,16 +25,18 @@ read_cache_fields() {
   cache_latest=""
   cache_dismissed=""
   [ -f "$1" ] || return 0
-  {
-    IFS= read -r cache_ts
-    IFS= read -r cache_latest
-    IFS= read -r cache_dismissed
-  } < <(awk -F'"' '
+  local _awk_out
+  _awk_out="$(awk -F'"' '
     /"last_check"[[:space:]]*:/        { ts = $4 }
     /"latest_known"[[:space:]]*:/      { latest = $4 }
     /"dismissed_version"[[:space:]]*:/ { dismissed = $4 }
     END { print ts; print latest; print dismissed }
-  ' "$1")
+  ' "$1")"
+  {
+    IFS= read -r cache_ts
+    IFS= read -r cache_latest
+    IFS= read -r cache_dismissed
+  } <<< "$_awk_out"
 }
 
 # write_cache_json $cache_file $last_check $latest_known [$dismissed_version]

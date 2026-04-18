@@ -98,9 +98,17 @@ setup() {
 
 @test "install replaces stale symlink in skill slot" {
   mkdir -p "$FAKE_ROOT/.claude/skills"
-  ln -s /nonexistent "$FAKE_ROOT/.claude/skills/demo"
+  ln -s /nonexistent "$FAKE_ROOT/.claude/skills/demo" 2>/dev/null || skip "symlinks not supported"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ ! -L "$FAKE_ROOT/.claude/skills/demo" ]
+  [ -f "$FAKE_ROOT/.claude/skills/demo/SKILL.md" ]
+}
+
+@test "install replaces stale file blocking skill slot" {
+  mkdir -p "$FAKE_ROOT/.claude/skills"
+  echo "stale" > "$FAKE_ROOT/.claude/skills/demo"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
   [ -f "$FAKE_ROOT/.claude/skills/demo/SKILL.md" ]
 }
