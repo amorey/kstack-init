@@ -75,10 +75,7 @@ jobs:
       - name: Install bats-core (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        run: |
-          git clone --depth 1 https://github.com/bats-core/bats-core.git "$RUNNER_TEMP/bats"
-          "$RUNNER_TEMP/bats/install.sh" "$HOME/.local"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        run: npm install -g bats
 
       - name: Configure git identity
         run: |
