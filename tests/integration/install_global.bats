@@ -84,3 +84,46 @@ EOF
   [ "$status" -eq 0 ]
   assert_file_exists "$HOME/.claude/skills/kstack-demo/SKILL.md"
 }
+
+@test "install --global prunes orphan kstack-* skill slot" {
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  mkdir -p "$HOME/.claude/skills/kstack-ghost"
+  echo "stale" > "$HOME/.claude/skills/kstack-ghost/SKILL.md"
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.claude/skills/kstack-ghost" ]
+  assert_file_exists "$HOME/.claude/skills/kstack-demo/SKILL.md"
+}
+
+@test "install --global preserves non-kstack skill slot in shared skills dir" {
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  mkdir -p "$HOME/.claude/skills/user-own"
+  echo "mine" > "$HOME/.claude/skills/user-own/SKILL.md"
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  assert_file_exists "$HOME/.claude/skills/user-own/SKILL.md"
+}
+
+@test "install --global prunes orphan helper from \$HOME/.config/kstack/bin" {
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  echo "#!/bin/sh" > "$HOME/.config/kstack/bin/ghost-helper"
+  chmod +x "$HOME/.config/kstack/bin/ghost-helper"
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.config/kstack/bin/ghost-helper" ]
+  [ -x "$HOME/.config/kstack/bin/hello" ]
+}
+
+@test "install --global prunes orphan .sh file from \$HOME/.config/kstack/lib" {
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  echo "# stale" > "$HOME/.config/kstack/lib/ghost.sh"
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.config/kstack/lib/ghost.sh" ]
+  [ -f "$HOME/.config/kstack/lib/agents.sh" ]
+  [ -f "$HOME/.config/kstack/lib/cache.sh" ]
+}

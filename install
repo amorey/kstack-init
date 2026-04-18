@@ -163,6 +163,26 @@ render_man() {
   }
 }
 
+# prune_orphans $target_dir $glob $keep $label
+#   Remove any child of $target_dir matching $glob whose basename is not in
+#   $keep (space-delimited). Logs each removal as "    pruned: ${label}<basename>".
+#   No-op if $target_dir is missing or the glob matches nothing.
+prune_orphans() {
+  local dir="$1" glob="$2" keep="$3" label="$4"
+  [ -d "$dir" ] || return 0
+  local entry base
+  shopt -s nullglob
+  for entry in "$dir"/$glob; do
+    base="${entry##*/}"
+    case " $keep " in
+      *" $base "*) continue ;;
+    esac
+    rm -rf "$entry"
+    log "    pruned: ${label}${base}"
+  done
+  shopt -u nullglob
+}
+
 # install_agent $mode $agent $install_root $bin_dir $skills_dir $slot_prefix
 #   $mode is "local" or "global" — used for log text only.
 #   $slot_prefix is "" for local, "kstack-" for global.
@@ -170,7 +190,7 @@ install_agent() {
   local mode="$1" agent="$2" install_root="$3" bin_dir="$4" skills_dir="$5" slot_prefix="$6"
   mkdir -p "$skills_dir"
 
-  local installed="" skill out_dir out_file man_file
+  local installed="" keep="" skill out_dir out_file man_file
   for skill in $SKILL_NAMES; do
     out_dir="$skills_dir/${slot_prefix}${skill}"
     out_file="$out_dir/SKILL.md"
@@ -187,15 +207,24 @@ install_agent() {
       "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"
     render_man "$skill" "$SRC_ROOT/README.md" "$man_file"
     installed="$installed ${slot_prefix}${skill}"
+    keep="$keep ${slot_prefix}${skill}"
   done
 
   log "  $agent ($mode) → $skills_dir"
   log "    installed:$installed"
+
+  # Prune stale slots from prior installs. In global mode the glob is scoped
+  # to kstack-* so we never touch user-owned skills in a shared skills dir;
+  # in local mode the skills dir is install-owned (gitignored), so pruning
+  # any non-matching entry is safe.
+  local prune_glob="*"
+  [ -n "$slot_prefix" ] && prune_glob="${slot_prefix}*"
+  prune_orphans "$skills_dir" "$prune_glob" "${keep# }" ""
 }
 
 copy_bin_global() {
   mkdir -p "$KSTACK_GLOBAL_BIN"
-  local f name
+  local f name keep=""
   for f in "$BIN_DIR"/*; do
     [ -e "$f" ] || continue
     name="${f##*/}"
@@ -203,18 +232,22 @@ copy_bin_global() {
     [ "$name" = ".gitkeep" ] && continue
     cp "$f" "$KSTACK_GLOBAL_BIN/"
     chmod +x "$KSTACK_GLOBAL_BIN/$name"
+    keep="$keep $name"
   done
   log "  bin/ → $KSTACK_GLOBAL_BIN"
+  prune_orphans "$KSTACK_GLOBAL_BIN" "*" "${keep# }" "bin/"
 }
 
 copy_lib_global() {
   mkdir -p "$KSTACK_GLOBAL_LIB"
-  local f
+  local f keep=""
   for f in "$SRC_ROOT/lib"/*.sh; do
     [ -e "$f" ] || continue
     cp "$f" "$KSTACK_GLOBAL_LIB/"
+    keep="$keep ${f##*/}"
   done
   log "  lib/ → $KSTACK_GLOBAL_LIB"
+  prune_orphans "$KSTACK_GLOBAL_LIB" "*.sh" "${keep# }" "lib/"
 }
 
 main() {

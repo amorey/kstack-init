@@ -100,6 +100,7 @@ Each skill is invoked with `/<name>` inside a Claude Code session. All skills ar
 | `--namespace <n>` | Scope the run to a single namespace (defaults to all accessible)         |
 | `--json`          | Emit structured output for piping into other tools                       |
 | `--dry-run`       | Print the commands kstack would run without executing them               |
+| `--help`          | Print the skill's usage (arguments, options, examples) and exit          |
 
 ---
 

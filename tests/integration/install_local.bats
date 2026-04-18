@@ -155,3 +155,33 @@ setup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"no README section for /demo"* ]]
 }
+
+@test "install prunes orphan skill slot not backed by a source template" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  mkdir -p "$FAKE_ROOT/.claude/skills/ghost"
+  echo "stale" > "$FAKE_ROOT/.claude/skills/ghost/SKILL.md"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ ! -e "$FAKE_ROOT/.claude/skills/ghost" ]
+  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+}
+
+@test "install logs each pruned skill slot" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  mkdir -p "$FAKE_ROOT/.claude/skills/ghost"
+  echo "stale" > "$FAKE_ROOT/.claude/skills/ghost/SKILL.md"
+  run "$FAKE_ROOT/install" --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pruned: ghost"* ]]
+}
+
+@test "install leaves current skill slot intact on idempotent rerun" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+}
