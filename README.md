@@ -47,7 +47,7 @@ To install kstack globally so you can use the skills from a Claude Code session 
 curl -sS https://www.kubestack.xyz/install.sh | bash
 ```
 
-This will run a bootstrap script that installs the kstack skills into your Claude user-level skills directory (e.g. `~/.claude/skills`) with names prefixed with `/kstack-*`. By default, it will detect other available agents (e.g. Codex, OpenCode) and install into each of their skills directories as well. After installation, the skills will be available when you start a session in any project:
+This bootstrap script installs the kstack skills into your Claude user-level skills directory (e.g. `~/.claude/skills`), prefixing the names with `kstack-`. It also detects other available agents (e.g. Codex, OpenCode) and installs the skills into their skills directories by default. Once installed, the skills are available in any project session:
 
 ```console
 ──────────────────────────────────────────────────
@@ -55,14 +55,14 @@ This will run a bootstrap script that installs the kstack skills into your Claud
 ──────────────────────────────────────────────────
 ```
 
-To use kstack locally without modifying your global skills, you can clone this repo, run `./install`, then open a Claude Code session inside the repo:
+Alternatively, to use kstack locally without modifying your global skills you can run the `install` script in this repo:
 
 ```console
 git clone https://github.com/kubetail-org/kstack.git
 cd kstack && ./install && claude
 ```
 
-`./install` renders the skills into `.claude/skills/` (and the equivalent dir for any other agent CLI detected on your `PATH`), so they're discoverable the moment you start a session from the repo:
+`install` renders the skills into `.claude/skills/` (and the equivalent dir for any other agent CLI detected on your `PATH`), so they're discoverable the moment you start a session from the repo:
 
 ```console
 ──────────────────────────────────────────────────
