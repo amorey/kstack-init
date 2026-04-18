@@ -429,16 +429,18 @@ For a repo-local install, just delete the kstack repo directory. The local insta
 
 ## Development
 
+The source tree lives under `src/` (skills, helpers, scripts, tests). The repo root stays deliberately minimal for end users — just `README.md`, an `install` wrapper, `assets/`, and the usual metadata. If you're hacking on kstack, see `src/CLAUDE.md` for the full contributor guide.
+
 Run the test suite with bats-core:
 
 ```console
 brew install bats-core        # macOS
 # or: apt install bats        # Debian/Ubuntu
 
-./scripts/test.sh
+./src/scripts/test.sh
 ```
 
-Tests live in `tests/unit/` (sourced-function tests) and `tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu and macOS for every push and PR — see `.github/workflows/test.yml`.
+Tests live in `src/tests/unit/` (sourced-function tests) and `src/tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every push and PR — see `.github/workflows/ci.yml`.
 
 ## Get Involved
 

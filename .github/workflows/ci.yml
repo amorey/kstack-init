@@ -19,10 +19,11 @@ jobs:
         run: |
           shellcheck --severity=warning --external-sources \
             install \
-            bin/check-update bin/dismiss-update bin/uninstall bin/upgrade \
-            lib/*.sh lib/*/*.sh scripts/*.sh \
-            skills/cluster-status/scripts/snapshot \
-            tests/test_helper.bash
+            src/install \
+            src/bin/check-update src/bin/dismiss-update src/bin/uninstall src/bin/upgrade \
+            src/lib/*.sh src/lib/*/*.sh src/scripts/*.sh \
+            src/skills/cluster-status/scripts/snapshot \
+            src/tests/test_helper.bash
 
   bats:
     strategy:
@@ -90,7 +91,7 @@ jobs:
 
       - name: Run test suite
         shell: bash
-        run: ./scripts/test.sh
+        run: ./src/scripts/test.sh
 
   bats-e2e:
     runs-on: ubuntu-24.04
@@ -113,7 +114,7 @@ jobs:
           kubectl version --client
 
       - name: Run e2e suite
-        run: ./scripts/test-e2e.sh
+        run: ./src/scripts/test-e2e.sh
 
   evals:
     # Manual-only for now. Trigger with `gh workflow run ci.yml`. Graduates
@@ -153,12 +154,12 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           KSTACK_EVAL_MAX_RUNS: 3
           KSTACK_EVAL_BUDGET_USD: "2"
-        run: ./scripts/test-evals.sh
+        run: ./src/scripts/test-evals.sh
 
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: eval-artifacts
-          path: tests/evals/artifacts/
+          path: src/tests/evals/artifacts/
           retention-days: 30

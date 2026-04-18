@@ -61,7 +61,7 @@ exec \"\$REAL_GIT\" \"\${args[@]}\"
   run "$REPO_ROOT/scripts/install.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--global"* ]]
-  [ -d "$HOME/.config/kstack/src/.git" ]
+  [ -d "$HOME/.config/kstack/upstream/.git" ]
 }
 
 @test "scripts/install.sh exits 1 when GitHub API yields no tag" {

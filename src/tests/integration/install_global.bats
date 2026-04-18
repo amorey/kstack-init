@@ -16,23 +16,29 @@ setup() {
     git config user.email "test@example.com"
     git config user.name "Test"
 
-    mkdir -p bin lib skills/demo/scripts skills/_partials
-    cp "$REPO_ROOT/install" install
-    cp "$REPO_ROOT/lib/agents.sh" lib/agents.sh
-    cp "$REPO_ROOT/lib/cache.sh" lib/cache.sh
-    cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" skills/demo/SKILL.md.tmpl
-    cp "$FIXTURES_DIR/skills/_partials/global-flags.md" skills/_partials/global-flags.md
-    cp "$FIXTURES_DIR/skills/_partials/update-check.md" skills/_partials/update-check.md
+    mkdir -p src/bin src/lib src/skills/demo/scripts src/skills/_partials
+    # Thin wrapper at repo root, real install under src/ — mirrors the real repo.
+    cat > install <<'EOF'
+#!/usr/bin/env bash
+set -eu
+exec "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/src/install" "$@"
+EOF
+    cp "$REPO_ROOT/install" src/install
+    cp "$REPO_ROOT/lib/agents.sh" src/lib/agents.sh
+    cp "$REPO_ROOT/lib/cache.sh" src/lib/cache.sh
+    cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
+    cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
+    cp "$FIXTURES_DIR/skills/_partials/update-check.md" src/skills/_partials/update-check.md
     cp "$FIXTURES_DIR/README.md" README.md
-    cat > bin/hello <<'EOF'
+    cat > src/bin/hello <<'EOF'
 #!/usr/bin/env bash
 echo hello
 EOF
-    cat > skills/demo/scripts/snapshot <<'EOF'
+    cat > src/skills/demo/scripts/snapshot <<'EOF'
 #!/usr/bin/env bash
 echo snap
 EOF
-    chmod +x bin/hello install skills/demo/scripts/snapshot
+    chmod +x install src/install src/bin/hello src/skills/demo/scripts/snapshot
     git add -A
     git commit --quiet -m "init"
     git branch -M main

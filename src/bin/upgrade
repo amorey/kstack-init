@@ -10,7 +10,7 @@ main() {
   ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
   if [ "$ROOT_DIR" = "$HOME/.config/kstack" ]; then
-    exec "$ROOT_DIR/src/install" --global "$@"
+    exec "$ROOT_DIR/upstream/install" --global "$@"
   fi
 
   # Repo-local: ROOT_DIR is <repo>/.kstack; the checked-out source is one level up.

@@ -4,22 +4,32 @@ setup() {
   load '../test_helper.bash'
   common_setup
 
-  # Build a minimal fake kstack checkout (skills, partials, lib, install, bin).
+  # Build a minimal fake kstack checkout with the nested src/ layout that the
+  # real repo uses: top-level install wrapper + src/{install,lib,bin,skills,...}.
   FAKE_ROOT="$TMPDIR_TEST/kstack"
-  mkdir -p "$FAKE_ROOT/bin" "$FAKE_ROOT/lib" "$FAKE_ROOT/skills/demo" "$FAKE_ROOT/skills/_partials"
+  mkdir -p "$FAKE_ROOT/src/bin" "$FAKE_ROOT/src/lib" \
+           "$FAKE_ROOT/src/skills/demo" "$FAKE_ROOT/src/skills/_partials"
 
-  cp "$REPO_ROOT/install" "$FAKE_ROOT/install"
-  cp "$REPO_ROOT/lib/agents.sh" "$FAKE_ROOT/lib/agents.sh"
-  cp "$REPO_ROOT/lib/cache.sh" "$FAKE_ROOT/lib/cache.sh"
-  cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/skills/demo/SKILL.md.tmpl"
-  cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/skills/_partials/global-flags.md"
-  cp "$FIXTURES_DIR/skills/_partials/update-check.md" "$FAKE_ROOT/skills/_partials/update-check.md"
+  # Thin wrapper at repo root — mirrors the real <repo>/install.
+  cat > "$FAKE_ROOT/install" <<'EOF'
+#!/usr/bin/env bash
+set -eu
+exec "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/src/install" "$@"
+EOF
+  chmod +x "$FAKE_ROOT/install"
+
+  cp "$REPO_ROOT/install" "$FAKE_ROOT/src/install"
+  cp "$REPO_ROOT/lib/agents.sh" "$FAKE_ROOT/src/lib/agents.sh"
+  cp "$REPO_ROOT/lib/cache.sh" "$FAKE_ROOT/src/lib/cache.sh"
+  cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/src/skills/demo/SKILL.md.tmpl"
+  cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/src/skills/_partials/global-flags.md"
+  cp "$FIXTURES_DIR/skills/_partials/update-check.md" "$FAKE_ROOT/src/skills/_partials/update-check.md"
   cp "$FIXTURES_DIR/README.md" "$FAKE_ROOT/README.md"
-  cat > "$FAKE_ROOT/bin/hello" <<'EOF'
+  cat > "$FAKE_ROOT/src/bin/hello" <<'EOF'
 #!/usr/bin/env bash
 echo hello
 EOF
-  chmod +x "$FAKE_ROOT/bin/hello" "$FAKE_ROOT/install"
+  chmod +x "$FAKE_ROOT/src/bin/hello" "$FAKE_ROOT/src/install"
 }
 
 @test "install --agent claude renders SKILL.md into .claude/skills/demo" {
@@ -92,14 +102,14 @@ EOF
 }
 
 @test "install with no skills/ directory exits 1" {
-  rm -rf "$FAKE_ROOT/skills"
+  rm -rf "$FAKE_ROOT/src/skills"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 1 ]
   [[ "$output" == *"No skills/ directory"* ]]
 }
 
 @test "install with missing global-flags partial exits 1" {
-  rm "$FAKE_ROOT/skills/_partials/global-flags.md"
+  rm "$FAKE_ROOT/src/skills/_partials/global-flags.md"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 1 ]
   [[ "$output" == *"missing partial"* ]]
@@ -215,12 +225,12 @@ EOF
 }
 
 @test "install copies skills/<name>/scripts/ into rendered slot as executable" {
-  mkdir -p "$FAKE_ROOT/skills/demo/scripts"
-  cat > "$FAKE_ROOT/skills/demo/scripts/snapshot" <<'EOF'
+  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts"
+  cat > "$FAKE_ROOT/src/skills/demo/scripts/snapshot" <<'EOF'
 #!/usr/bin/env bash
 echo snap
 EOF
-  chmod +x "$FAKE_ROOT/skills/demo/scripts/snapshot"
+  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
@@ -233,27 +243,27 @@ EOF
 }
 
 @test "install prunes stale scripts/ slot when source dir is removed" {
-  mkdir -p "$FAKE_ROOT/skills/demo/scripts"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/skills/demo/scripts/snapshot"
-  chmod +x "$FAKE_ROOT/skills/demo/scripts/snapshot"
+  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
+  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
-  rm -rf "$FAKE_ROOT/skills/demo/scripts"
+  rm -rf "$FAKE_ROOT/src/skills/demo/scripts"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts" ]
 }
 
 @test "install prunes orphan scripts when source dir shrinks" {
-  mkdir -p "$FAKE_ROOT/skills/demo/scripts"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/skills/demo/scripts/snapshot"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/skills/demo/scripts/extra"
-  chmod +x "$FAKE_ROOT/skills/demo/scripts/snapshot" "$FAKE_ROOT/skills/demo/scripts/extra"
+  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/extra"
+  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot" "$FAKE_ROOT/src/skills/demo/scripts/extra"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/extra" ]
-  rm "$FAKE_ROOT/skills/demo/scripts/extra"
+  rm "$FAKE_ROOT/src/skills/demo/scripts/extra"
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]

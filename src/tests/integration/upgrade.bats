@@ -5,16 +5,16 @@ setup() {
   common_setup
 }
 
-@test "upgrade in global location execs src/install --global" {
+@test "upgrade in global location execs upstream/install --global" {
   # Stage a fake global install.
-  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/src"
+  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/upstream"
   cp "$REPO_ROOT/bin/upgrade" "$HOME/.config/kstack/bin/upgrade"
   chmod +x "$HOME/.config/kstack/bin/upgrade"
-  cat > "$HOME/.config/kstack/src/install" <<'EOF'
+  cat > "$HOME/.config/kstack/upstream/install" <<'EOF'
 #!/usr/bin/env bash
 echo "GLOBAL-INSTALL:$*"
 EOF
-  chmod +x "$HOME/.config/kstack/src/install"
+  chmod +x "$HOME/.config/kstack/upstream/install"
 
   run "$HOME/.config/kstack/bin/upgrade" --extra
   [ "$status" -eq 0 ]
