@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2034  # this lib populates vars in the caller's scope; "unused" reads are in the sourcing script.
 # kstack update cache — shared by check-update and dismiss-update.
 #
 # Source this file; do not execute it. Requires $HOME.

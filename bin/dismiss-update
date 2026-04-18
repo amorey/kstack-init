@@ -22,6 +22,7 @@ main() {
     exit 0
   fi
 
+  # shellcheck disable=SC2034  # cache_dismissed is declared local so read_cache_fields doesn't leak to global scope.
   local cache_ts cache_latest cache_dismissed
   read_cache_fields "$CACHE_FILE"
 

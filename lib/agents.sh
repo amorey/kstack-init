@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # kstack agent table — shared between install, uninstall, and test suite.
 #
 # Source this file; do not execute it.

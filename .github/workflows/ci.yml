@@ -10,6 +10,19 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run shellcheck
+        run: |
+          shellcheck --severity=warning --external-sources \
+            install \
+            bin/check-update bin/dismiss-update bin/uninstall bin/upgrade \
+            lib/*.sh scripts/*.sh \
+            tests/test_helper.bash
+
   bats:
     strategy:
       fail-fast: false

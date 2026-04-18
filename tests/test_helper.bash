@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2034  # vars like REPO_ROOT/FIXTURES_DIR are consumed by tests that source this file.
 # Shared helpers for the kstack bats suite.
 #
 # Each test's setup() should call common_setup to isolate HOME in a tmpdir.
