@@ -41,13 +41,13 @@ Our goal is to bring the power of AI to K8s monitoring in a user-friendly and co
 
 ## Quickstart
 
-To install kstack globally so you can use the skills from a Claude Code session inside any project run:
+To install kstack globally so you can use the skills from inside any project run:
 
 ```console
 curl -sS https://www.kubestack.xyz/install.sh | bash
 ```
 
-This bootstrap script installs the kstack skills into your Claude user-level skills directory (e.g. `~/.claude/skills`), prefixing the names with `kstack-`. It also detects other available agents (e.g. Codex, OpenCode) and installs the skills into their skills directories by default. Once installed, the skills are available in any project session:
+This bootstrap script installs the kstack skills into your Claude user-level skills directory (e.g. `~/.claude/skills`), prefixing the names with `kstack-`. It also detects other available agents (e.g. Codex, OpenCode) and installs the skills into their skills directories as well. Once installed, the skills are available in any project session:
 
 ```console
 ───────────────────────────────────
@@ -55,14 +55,14 @@ This bootstrap script installs the kstack skills into your Claude user-level ski
 ───────────────────────────────────
 ```
 
-Alternatively, to use kstack locally without modifying your global skills you can run the `install` script in this repo:
+Alternatively, you can install kstack in repo-local mode to make the skills available only to sessions started from inside this repo directory:
 
 ```console
 git clone https://github.com/kubetail-org/kstack.git
 cd kstack && ./install
 ```
 
-`install` renders the skills into `.claude/skills/` (and the equivalent dir for any other agent CLI detected on your `PATH`), so they're discoverable the moment you start a session from the repo:
+The skills are rendered into `.claude/skills/` (and the equivalent dir for any other agent CLI detected on your `PATH`), so they're discoverable the moment you start a session from the repo:
 
 ```console
 ───────────────────────────────────

@@ -22,7 +22,7 @@ PATHS="
   .slate
   .kiro
   .hermes
-  .cache
+  .kstack
   .build
 "
 

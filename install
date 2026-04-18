@@ -337,7 +337,7 @@ main() {
     done
   else
     log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
-    mkdir -p "$SCRIPT_DIR/.cache/kstack"
+    mkdir -p "$SCRIPT_DIR/.kstack/cache"
     for h in $TARGET_AGENTS; do
       install_agent local "$h" "$SCRIPT_DIR" "$BIN_DIR" \
         "$(agent_skills_dir_local "$SCRIPT_DIR" "$h")" ""

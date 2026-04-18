@@ -12,12 +12,12 @@ setup() {
 }
 
 @test "clean.sh removes every listed path that exists" {
-  mkdir -p "$FAKE_REPO/.claude/skills" "$FAKE_REPO/.cache/kstack" "$FAKE_REPO/.codex"
+  mkdir -p "$FAKE_REPO/.claude/skills" "$FAKE_REPO/.kstack/cache" "$FAKE_REPO/.codex"
 
   run "$FAKE_REPO/scripts/clean.sh"
   [ "$status" -eq 0 ]
   [ ! -e "$FAKE_REPO/.claude" ]
-  [ ! -e "$FAKE_REPO/.cache" ]
+  [ ! -e "$FAKE_REPO/.kstack" ]
   [ ! -e "$FAKE_REPO/.codex" ]
 }
 

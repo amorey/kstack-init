@@ -12,7 +12,7 @@ resolve_cache_paths() {
     CACHE_DIR="$INSTALL_ROOT/cache"
   else
     INSTALL_ROOT="$(dirname "$1")"
-    CACHE_DIR="$INSTALL_ROOT/.cache/kstack"
+    CACHE_DIR="$INSTALL_ROOT/.kstack/cache"
   fi
   CACHE_FILE="$CACHE_DIR/update.json"
 }

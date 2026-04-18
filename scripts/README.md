@@ -2,7 +2,7 @@
 
 ## `clean.sh`
 
-Wipes repo-local install artifacts (rendered skill directories, `.cache/`, legacy `.build/`) so you can re-run `./install` against a clean tree. Development-only; only touches gitignored paths.
+Wipes repo-local install artifacts (rendered skill directories, `.kstack/`, legacy `.build/`) so you can re-run `./install` against a clean tree. Development-only; only touches gitignored paths.
 
 ## `install.sh`
 

@@ -12,7 +12,7 @@ kstack is a **skill pack** (not an app) distributed to Claude Code and other age
 - `bats tests/unit/<file>.bats` — run a single test file. Use `bats -f "<name pattern>" …` to run one test.
 - `./install` — render skills into `<repo>/.<agent>/skills/…` for every agent CLI detected on `PATH` (repo-local mode).
 - `./install --global` — clone/update `~/.config/kstack/src/` at the latest release tag and render into `~/.<agent>/skills/kstack-<skill>/…`. Do **not** use the invoker's checkout as the source in global mode; it always pulls canonical upstream.
-- `./scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.cache/`, etc.) so `./install` runs against a clean tree.
+- `./scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
 
 CI (`.github/workflows/ci.yml`) runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR.
 
@@ -47,7 +47,7 @@ The `bin/` helpers (`check-update`, `upgrade`, `uninstall`, `dismiss-update`) de
 
 ### Cache / state paths
 
-Per-context cache + learned state live under `~/.config/kstack/cache/` and `~/.config/kstack/state/` (global) or `<repo>/.cache/kstack/` (repo-local). `lib/cache.sh` resolves the correct paths based on caller location. The `/forget` skill clears these; `/cleanup-cluster` clears in-cluster resources (anything labeled `kstack.kubetail.com/owned-by=kstack`).
+Per-context cache + learned state live under `~/.config/kstack/{cache,state}/` (global) or `<repo>/.kstack/{cache,state}/` (repo-local). `lib/cache.sh` resolves the correct paths based on caller location. The `/forget` skill clears these; `/cleanup-cluster` clears in-cluster resources (anything labeled `kstack.kubetail.com/owned-by=kstack`).
 
 ## Tests
 

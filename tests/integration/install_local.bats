@@ -63,10 +63,10 @@ setup() {
   [[ "$output" == *"Unknown option: --bogus"* ]]
 }
 
-@test "install creates .cache/kstack in repo-local mode" {
+@test "install creates .kstack/cache in repo-local mode" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -d "$FAKE_ROOT/.cache/kstack" ]
+  [ -d "$FAKE_ROOT/.kstack/cache" ]
 }
 
 @test "install with no skills/ directory exits 1" {
