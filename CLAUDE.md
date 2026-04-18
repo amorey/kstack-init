@@ -24,7 +24,7 @@ CI (`.github/workflows/ci.yml`) runs four jobs. `lint` shellchecks `install`, ev
 
 Skills are authored as `skills/<name>/SKILL.md.tmpl`. The `install` script renders each skill slot in two passes:
 
-1. **`render_skill`** — inlines partials at `{{GLOBAL_FLAGS}}` and `{{UPDATE_CHECK}}` markers from `skills/_partials/`, then substitutes scalar placeholders `{{INSTALL_ROOT}}`, `{{BIN_DIR}}`, `{{HELP_PATH}}`, `{{SKILL_NAME}}`, `{{AGENT}}`. Writes the resolved `SKILL.md` into the agent-specific skills dir (no intermediate dist/).
+1. **`render_skill`** — inlines partials at `{{GLOBAL_FLAGS}}` and `{{UPDATE_CHECK}}` markers from `skills/_partials/`, then substitutes scalar placeholders `{{ROOT_DIR}}`, `{{BIN_DIR}}`, `{{HELP_PATH}}`, `{{SKILL_NAME}}`, `{{AGENT}}`. Writes the resolved `SKILL.md` into the agent-specific skills dir (no intermediate dist/).
 2. **`render_help`** — extracts the `<dt>/<dd>` block for `#### /<skill>` from `README.md`, appends the `**Global flags**` section, and terminates the file with the literal sentinel `=== END HELP ===`. Output goes to `<skill-slot>/references/help.md`, and its absolute path is what `{{HELP_PATH}}` resolves to. The `--help` flag in the global-flags partial is wired to `cat` this file and stop on the sentinel, so every skill gets a consistent help page sourced from the README.
 
 `SKILL.md.tmpl` and the README section are the sources of truth — rendered `SKILL.md` and `references/help.md` files are gitignored and must never be hand-edited. Cross-cutting prose (global flags, update notices) belongs in a partial, not duplicated into every skill. A new skill needs both a `SKILL.md.tmpl` and a matching `#### /<skill>` section in `README.md`, or `render_help` will exit non-zero during install.
@@ -37,18 +37,20 @@ When a skill body needs to invoke a helper, reference it as `{{BIN_DIR}}/<tool>`
 
 ### Two install modes
 
-- **Repo-local** (`./install`): renders into `<repo>/.<agent>/skills/<name>/SKILL.md`. `{{INSTALL_ROOT}}` = repo root, `{{BIN_DIR}}` = `<repo>/bin`. Upgrade via `git pull && ./install`.
-- **Global** (`./install --global`): maintains `~/.config/kstack/src/` at the latest `v*` tag, copies `bin/` → `~/.config/kstack/bin/` and `lib/` → `~/.config/kstack/lib/`, renders into `~/.<agent>/skills/kstack-<name>/SKILL.md`. Upgrade via `~/.config/kstack/bin/upgrade`.
+Both modes materialize a symmetric `{{ROOT_DIR}}/{bin,lib,cache}/` layout — the only differences are where `{{ROOT_DIR}}` sits and which skills dir the rendered `SKILL.md` files land in.
 
-The `bin/` helpers (`check-update`, `upgrade`, `uninstall`, `dismiss-update`) detect their mode by comparing `SCRIPT_DIR` to `$HOME/.config/kstack/bin`. Keep that invariant when adding helpers.
+- **Repo-local** (`./install`): copies `bin/` → `<repo>/.kstack/bin/` and `lib/` → `<repo>/.kstack/lib/` (recursive — per-skill helper trees at `lib/<skill>/` are supported), writes `<repo>/.kstack/install.conf` from `git describe --tags --exact-match HEAD` (or current branch name), and renders skills into `<repo>/.<agent>/skills/<name>/SKILL.md`. `{{ROOT_DIR}}` = `<repo>/.kstack`, `{{BIN_DIR}}` = `<repo>/.kstack/bin`. Upgrade via `git pull && ./install` or `<repo>/.kstack/bin/upgrade`.
+- **Global** (`./install --global`): maintains `~/.config/kstack/src/` at the latest `v*` tag, copies `bin/` → `~/.config/kstack/bin/` and `lib/` → `~/.config/kstack/lib/` (recursive), renders into `~/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `~/.config/kstack`, `{{BIN_DIR}}` = `~/.config/kstack/bin`. Upgrade via `~/.config/kstack/bin/upgrade`.
+
+The `bin/` helpers (`check-update`, `upgrade`, `uninstall`, `dismiss-update`) assume they sit at `{{ROOT_DIR}}/bin/<name>` and derive `ROOT_DIR` as `dirname "$SCRIPT_DIR"`. Running a helper directly from the source tree (`./bin/check-update`) without installing first is unsupported — paths resolve to the repo root rather than `.kstack/`. Keep that invariant when adding helpers.
 
 ### Bootstrap duplication
 
 `scripts/install.sh` is the source for the `curl … | bash` bootstrap hosted at `https://www.kubestack.xyz/install.sh`. A verbatim copy lives in the `kubetail-website` repo's static assets and is **not automatically synced** — when you edit this file, copy it over manually.
 
-### Cache / state paths
+### Install root layout
 
-Per-context cache + learned state live under `~/.config/kstack/{cache,state}/` (global) or `<repo>/.kstack/{cache,state}/` (repo-local). `lib/cache.sh` resolves the correct paths based on caller location. The `/forget` skill clears these; `/cleanup-cluster` clears in-cluster resources (anything labeled `kstack.kubetail.com/owned-by=kstack`).
+An install materializes `{{ROOT_DIR}}/{bin,lib,cache,state,install.conf}` — `~/.config/kstack/...` globally, `<repo>/.kstack/...` repo-locally. `bin/` and `lib/` are copies of the source tree (rerun `./install` to pick up changes). `cache/` holds the update-check cache and is managed by `lib/cache.sh` (now a single-branch function keyed off `dirname "$SCRIPT_DIR"`). `state/` holds per-context learned state. The `/forget` skill clears the `cache/` and `state/` subtrees; `/cleanup-cluster` clears in-cluster resources (anything labeled `kstack.kubetail.com/owned-by=kstack`).
 
 ## Tests
 

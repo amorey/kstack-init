@@ -4,18 +4,11 @@
 #
 # Source this file; do not execute it. Requires $HOME.
 
-# resolve_cache_paths $script_dir
-#   Sets INSTALL_ROOT, CACHE_DIR, CACHE_FILE based on whether $script_dir
-#   lives inside the global install (~/.config/kstack/bin) or a repo-local
-#   checkout (<repo>/bin).
+# resolve_cache_paths $script_dir — sets ROOT_DIR, CACHE_DIR, CACHE_FILE.
+# Both modes live under {root}/bin/<helper>, so root is dirname($script_dir).
 resolve_cache_paths() {
-  if [ "$1" = "$HOME/.config/kstack/bin" ]; then
-    INSTALL_ROOT="$HOME/.config/kstack"
-    CACHE_DIR="$INSTALL_ROOT/cache"
-  else
-    INSTALL_ROOT="$(dirname "$1")"
-    CACHE_DIR="$INSTALL_ROOT/.kstack/cache"
-  fi
+  ROOT_DIR="$(dirname "$1")"
+  CACHE_DIR="$ROOT_DIR/cache"
   CACHE_FILE="$CACHE_DIR/update.json"
 }
 

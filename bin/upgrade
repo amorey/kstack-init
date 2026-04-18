@@ -7,12 +7,14 @@ set -eu
 
 main() {
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-  if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
-    exec "$HOME/.config/kstack/src/install" --global "$@"
+  if [ "$ROOT_DIR" = "$HOME/.config/kstack" ]; then
+    exec "$ROOT_DIR/src/install" --global "$@"
   fi
 
-  REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+  # Repo-local: ROOT_DIR is <repo>/.kstack; the checked-out source is one level up.
+  REPO_ROOT="$(dirname "$ROOT_DIR")"
   cd "$REPO_ROOT"
   git pull --ff-only
   exec ./install "$@"

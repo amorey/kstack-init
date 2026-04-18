@@ -39,8 +39,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPT_DIR/lib/agents.sh"
 
 KSTACK_CONFIG_DIR="$HOME/.config/kstack"
-KSTACK_GLOBAL_BIN="$KSTACK_CONFIG_DIR/bin"
-KSTACK_GLOBAL_LIB="$KSTACK_CONFIG_DIR/lib"
 KSTACK_SRC="$KSTACK_CONFIG_DIR/src"
 # Override KSTACK_REMOTE_URL for CI and local-clone testing. Leave unset for
 # normal user installs.
@@ -49,59 +47,59 @@ KSTACK_REMOTE_URL="${KSTACK_REMOTE_URL:-https://github.com/kubetail-org/kstack.g
 QUIET=0
 log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
 
+# write_install_conf $root $version
+write_install_conf() { printf '%s\n' "$2" > "$1/install.conf"; }
+
 # Clones (first time) or fetches+checks-out (subsequent runs) the canonical
 # upstream at the latest tagged release. Pre-release fallback: if no `v*` tags
 # exist anywhere, use `main` with a visible warning.
 ensure_src_checkout() {
   mkdir -p "$KSTACK_CONFIG_DIR"
-
+  local tag
   if [ -d "$KSTACK_SRC/.git" ]; then
     log "Updating $KSTACK_SRC"
     git -C "$KSTACK_SRC" fetch --tags --quiet origin
-    local tag
     tag="$(git -C "$KSTACK_SRC" tag -l 'v*' --sort=-v:refname | head -1)"
     if [ -n "$tag" ]; then
       git -C "$KSTACK_SRC" checkout --quiet "$tag"
-      echo "$tag" > "$KSTACK_CONFIG_DIR/install.conf"
       log "  checked out $tag"
     else
       log "  no tagged release found; tracking main"
       git -C "$KSTACK_SRC" checkout --quiet main
       git -C "$KSTACK_SRC" pull --ff-only --quiet origin main
-      echo "main" > "$KSTACK_CONFIG_DIR/install.conf"
+      tag="main"
     fi
   else
-    local tag
     tag="$(git ls-remote --tags "$KSTACK_REMOTE_URL" 'v*' 2>/dev/null \
       | awk -F'refs/tags/' '/refs\/tags\/v[0-9]/ && !/\^\{\}$/ { print $2 }' \
       | sort -V | tail -1)"
     if [ -n "$tag" ]; then
       log "Cloning kstack @ $tag into $KSTACK_SRC"
       git clone --depth 1 --branch "$tag" --quiet "$KSTACK_REMOTE_URL" "$KSTACK_SRC"
-      echo "$tag" > "$KSTACK_CONFIG_DIR/install.conf"
     else
       log "No tagged release found; cloning main into $KSTACK_SRC"
       git clone --depth 1 --branch main --quiet "$KSTACK_REMOTE_URL" "$KSTACK_SRC"
-      echo "main" > "$KSTACK_CONFIG_DIR/install.conf"
+      tag="main"
     fi
   fi
+  write_install_conf "$KSTACK_CONFIG_DIR" "$tag"
 }
 
-# render_skill $skill $agent $install_root $bin_dir $help_path $out_file $skills_src $global_flags_partial $update_check_partial
+# render_skill $skill $agent $root_dir $bin_dir $help_path $out_file $skills_src $global_flags_partial $update_check_partial
 render_skill() {
-  local skill="$1" agent="$2" install_root="$3" bin_dir="$4" help_path="$5" out_file="$6"
+  local skill="$1" agent="$2" root_dir="$3" bin_dir="$4" help_path="$5" out_file="$6"
   local skills_src="$7" gf="$8" uc="$9"
   mkdir -p "$(dirname "$out_file")"
   awk -v gf="$gf" -v uc="$uc" \
-      -v install_root="$install_root" -v bin_dir="$bin_dir" \
+      -v root_dir="$root_dir" -v bin_dir="$bin_dir" \
       -v help_path="$help_path" \
       -v skill="$skill" -v agent="$agent" '
     function subst(s) {
-      gsub(/\{\{INSTALL_ROOT\}\}/, install_root, s)
-      gsub(/\{\{BIN_DIR\}\}/,      bin_dir,      s)
-      gsub(/\{\{HELP_PATH\}\}/,    help_path,    s)
-      gsub(/\{\{SKILL_NAME\}\}/,   skill,        s)
-      gsub(/\{\{AGENT\}\}/,        agent,        s)
+      gsub(/\{\{ROOT_DIR\}\}/,     root_dir,  s)
+      gsub(/\{\{BIN_DIR\}\}/,      bin_dir,   s)
+      gsub(/\{\{HELP_PATH\}\}/,    help_path, s)
+      gsub(/\{\{SKILL_NAME\}\}/,   skill,     s)
+      gsub(/\{\{AGENT\}\}/,        agent,     s)
       return s
     }
     function inline(path,    line) {
@@ -167,7 +165,7 @@ prune_orphans() {
   local entry base
   for entry in "$dir"/$glob; do
     [ -e "$entry" ] || continue
-    base="${entry##*/}"
+    base="${entry%/}"; base="${base##*/}"
     case " $keep " in
       *" $base "*) continue ;;
     esac
@@ -176,11 +174,11 @@ prune_orphans() {
   done
 }
 
-# install_agent $mode $agent $install_root $bin_dir $skills_dir $slot_prefix
+# install_agent $mode $agent $root_dir $bin_dir $skills_dir $slot_prefix
 #   $mode is "local" or "global" — used for log text only.
 #   $slot_prefix is "" for local, "kstack-" for global.
 install_agent() {
-  local mode="$1" agent="$2" install_root="$3" bin_dir="$4" skills_dir="$5" slot_prefix="$6"
+  local mode="$1" agent="$2" root_dir="$3" bin_dir="$4" skills_dir="$5" slot_prefix="$6"
   mkdir -p "$skills_dir"
 
   local slots="" skill slot out_dir out_file help_file
@@ -196,7 +194,7 @@ install_agent() {
     [ -L "$out_file" ] && rm -f "$out_file"
     [ -L "$help_file" ] && rm -f "$help_file"
     mkdir -p "$out_dir"
-    render_skill "$skill" "$agent" "$install_root" "$bin_dir" "$help_file" "$out_file" \
+    render_skill "$skill" "$agent" "$root_dir" "$bin_dir" "$help_file" "$out_file" \
       "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"
     render_help "$skill" "$SRC_ROOT/README.md" "$help_file"
     slots="$slots $slot"
@@ -212,10 +210,10 @@ install_agent() {
   prune_orphans "$skills_dir" "${slot_prefix}*" "${slots# }" ""
 }
 
-# sync_dir_global $src $glob $dst $label $executable
+# sync_dir $src $glob $dst $label $executable
 #   Copies $src/$glob → $dst/, then prunes any $glob-matching orphan in $dst.
 #   Skips .gitkeep placeholders. $executable=1 chmods each copy +x.
-sync_dir_global() {
+sync_dir() {
   local src="$1" glob="$2" dst="$3" label="$4" executable="$5"
   mkdir -p "$dst"
   local f name keep=""
@@ -231,8 +229,34 @@ sync_dir_global() {
   prune_orphans "$dst" "$glob" "${keep# }" "$label"
 }
 
-copy_bin_global() { sync_dir_global "$BIN_DIR"      '*'    "$KSTACK_GLOBAL_BIN" "bin/" 1; }
-copy_lib_global() { sync_dir_global "$SRC_ROOT/lib" '*.sh' "$KSTACK_GLOBAL_LIB" "lib/" 0; }
+# copy_bin $src $dst
+#   Materialize every file in $src/ into $dst/ as an executable helper.
+copy_bin() { sync_dir "$1" '*' "$2" "bin/" 1; }
+
+# copy_lib $src $dst — sync lib/*.sh and each lib/<subdir>/ (per-skill helpers).
+copy_lib() {
+  local src="$1" dst="$2" d name keep=""
+  sync_dir "$src" '*.sh' "$dst" "lib/" 0
+  for d in "$src"/*/; do
+    [ -d "$d" ] || continue
+    name="${d%/}"; name="${name##*/}"
+    rm -rf "${dst:?}/$name"
+    cp -R "$d" "$dst/$name"
+    log "  lib/$name/ → $dst/$name"
+    keep="$keep $name"
+  done
+  prune_orphans "$dst" '*/' "${keep# }" "lib/"
+}
+
+# write_local_install_conf $root $src — record tag or branch; empty on detached HEAD.
+write_local_install_conf() {
+  local version
+  version="$(git -C "$2" describe --tags --exact-match HEAD 2>/dev/null \
+          || git -C "$2" rev-parse --abbrev-ref HEAD 2>/dev/null \
+          || true)"
+  [ "$version" = "HEAD" ] && version=""
+  write_install_conf "$1" "$version"
+}
 
 main() {
   AGENT=""
@@ -276,12 +300,15 @@ main() {
   if [ "$GLOBAL" -eq 1 ]; then
     ensure_src_checkout
     SRC_ROOT="$KSTACK_SRC"
+    ROOT_DIR="$KSTACK_CONFIG_DIR"
   else
     SRC_ROOT="$SCRIPT_DIR"
+    ROOT_DIR="$SCRIPT_DIR/.kstack"
   fi
+  BIN_DIR="$ROOT_DIR/bin"
+  LIB_DIR="$ROOT_DIR/lib"
 
   SKILLS_SRC="$SRC_ROOT/skills"
-  BIN_DIR="$SRC_ROOT/bin"
 
   if [ ! -d "$SKILLS_SRC" ]; then
     echo "No skills/ directory at $SKILLS_SRC" >&2
@@ -310,20 +337,22 @@ main() {
     fi
   done
 
+  mkdir -p "$ROOT_DIR/cache"
+  copy_bin "$SRC_ROOT/bin" "$BIN_DIR"
+  copy_lib "$SRC_ROOT/lib" "$LIB_DIR"
+
   if [ "$GLOBAL" -eq 1 ]; then
     log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
-    mkdir -p "$KSTACK_CONFIG_DIR/cache"
-    copy_bin_global
-    copy_lib_global
+    # install.conf is written by ensure_src_checkout.
     for h in $TARGET_AGENTS; do
-      install_agent global "$h" "$KSTACK_CONFIG_DIR" "$KSTACK_GLOBAL_BIN" \
+      install_agent global "$h" "$ROOT_DIR" "$BIN_DIR" \
         "$(agent_skills_dir_global "$h")" "kstack-"
     done
   else
     log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
-    mkdir -p "$SCRIPT_DIR/.kstack/cache"
+    write_local_install_conf "$ROOT_DIR" "$SRC_ROOT"
     for h in $TARGET_AGENTS; do
-      install_agent local "$h" "$SCRIPT_DIR" "$BIN_DIR" \
+      install_agent local "$h" "$ROOT_DIR" "$BIN_DIR" \
         "$(agent_skills_dir_local "$SCRIPT_DIR" "$h")" ""
     done
   fi
@@ -331,10 +360,10 @@ main() {
   log ""
   log "kstack installed. Start a session with your agent to use the skills."
   if [ "$GLOBAL" -eq 1 ]; then
-    log "To upgrade:   $KSTACK_GLOBAL_BIN/upgrade"
-    log "To uninstall: $KSTACK_GLOBAL_BIN/uninstall"
+    log "To upgrade:   $BIN_DIR/upgrade"
+    log "To uninstall: $BIN_DIR/uninstall"
   else
-    log "To upgrade:   git pull && ./install"
+    log "To upgrade:   git pull && ./install  (or $BIN_DIR/upgrade)"
     log "To uninstall: delete this kstack repo directory."
   fi
 }

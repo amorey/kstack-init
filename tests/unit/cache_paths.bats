@@ -10,14 +10,14 @@ setup() {
 
 @test "resolve_cache_paths: global mode points at ~/.config/kstack/cache" {
   resolve_cache_paths "$HOME/.config/kstack/bin"
-  [ "$INSTALL_ROOT" = "$HOME/.config/kstack" ]
+  [ "$ROOT_DIR" = "$HOME/.config/kstack" ]
   [ "$CACHE_DIR" = "$HOME/.config/kstack/cache" ]
   [ "$CACHE_FILE" = "$HOME/.config/kstack/cache/update.json" ]
 }
 
 @test "resolve_cache_paths: repo-local mode points at <repo>/.kstack/cache" {
-  resolve_cache_paths "/fake/repo/bin"
-  [ "$INSTALL_ROOT" = "/fake/repo" ]
+  resolve_cache_paths "/fake/repo/.kstack/bin"
+  [ "$ROOT_DIR" = "/fake/repo/.kstack" ]
   [ "$CACHE_DIR" = "/fake/repo/.kstack/cache" ]
   [ "$CACHE_FILE" = "/fake/repo/.kstack/cache/update.json" ]
 }

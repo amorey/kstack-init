@@ -10,12 +10,16 @@ setup() {
 
   cp "$REPO_ROOT/install" "$FAKE_ROOT/install"
   cp "$REPO_ROOT/lib/agents.sh" "$FAKE_ROOT/lib/agents.sh"
+  cp "$REPO_ROOT/lib/cache.sh" "$FAKE_ROOT/lib/cache.sh"
   cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/skills/demo/SKILL.md.tmpl"
   cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/skills/_partials/global-flags.md"
   cp "$FIXTURES_DIR/skills/_partials/update-check.md" "$FAKE_ROOT/skills/_partials/update-check.md"
   cp "$FIXTURES_DIR/README.md" "$FAKE_ROOT/README.md"
-  : > "$FAKE_ROOT/bin/.gitkeep"
-  chmod +x "$FAKE_ROOT/install"
+  cat > "$FAKE_ROOT/bin/hello" <<'EOF'
+#!/usr/bin/env bash
+echo hello
+EOF
+  chmod +x "$FAKE_ROOT/bin/hello" "$FAKE_ROOT/install"
 }
 
 @test "install --agent claude renders SKILL.md into .claude/skills/demo" {
@@ -27,10 +31,28 @@ setup() {
 @test "install --agent claude uses local paths in template output" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "install_root: $FAKE_ROOT" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  run grep -F "install_root: $FAKE_ROOT/.kstack" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
-  run grep -F "bin_dir: $FAKE_ROOT/bin" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  run grep -F "bin_dir: $FAKE_ROOT/.kstack/bin" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
+}
+
+@test "install materializes bin/ under .kstack" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$FAKE_ROOT/.kstack/bin/hello" ]
+}
+
+@test "install materializes lib/ under .kstack" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -f "$FAKE_ROOT/.kstack/lib/cache.sh" ]
+}
+
+@test "install writes install.conf under .kstack" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -f "$FAKE_ROOT/.kstack/install.conf" ]
 }
 
 @test "install --agent codex writes to .codex/skills/demo" {

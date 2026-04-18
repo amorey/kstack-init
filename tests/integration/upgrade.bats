@@ -22,10 +22,10 @@ EOF
 }
 
 @test "upgrade in repo-local location git-pulls then execs ./install" {
-  # Stage a fake repo.
+  # Stage a fake repo with the installed layout under .kstack/.
   FAKE_REPO="$TMPDIR_TEST/fake-repo"
   BARE="$TMPDIR_TEST/fake-repo.git"
-  mkdir -p "$FAKE_REPO/bin" "$BARE"
+  mkdir -p "$FAKE_REPO/.kstack/bin" "$BARE"
 
   git init --quiet --bare "$BARE"
   git -c init.defaultBranch=main init --quiet "$FAKE_REPO"
@@ -38,8 +38,8 @@ EOF
 echo "LOCAL-INSTALL:$*"
 EOF
     chmod +x install
-    cp "$REPO_ROOT/bin/upgrade" bin/upgrade
-    chmod +x bin/upgrade
+    cp "$REPO_ROOT/bin/upgrade" .kstack/bin/upgrade
+    chmod +x .kstack/bin/upgrade
     git add -A
     git commit --quiet -m "init"
     git branch -M main
@@ -47,7 +47,7 @@ EOF
     git push --quiet -u origin main
   )
 
-  run "$FAKE_REPO/bin/upgrade" --foo
+  run "$FAKE_REPO/.kstack/bin/upgrade" --foo
   [ "$status" -eq 0 ]
   [[ "$output" == *"LOCAL-INSTALL:--foo"* ]]
 }

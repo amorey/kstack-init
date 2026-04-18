@@ -45,21 +45,21 @@ main() {
   resolve_cache_paths "$SCRIPT_DIR"
 
   local INSTALLED=""
-  if [ "$SCRIPT_DIR" = "$HOME/.config/kstack/bin" ]; then
-    [ -f "$INSTALL_ROOT/install.conf" ] && read -r INSTALLED < "$INSTALL_ROOT/install.conf" 2>/dev/null
-  else
+  [ -f "$ROOT_DIR/install.conf" ] && read -r INSTALLED < "$ROOT_DIR/install.conf" 2>/dev/null
+  case "$INSTALLED" in
+    ""|main) bail ;;
+  esac
+
+  # Fork-safety: if <repo>/.kstack sits next to <repo>/.git, bail unless origin is kubetail-org/kstack.
+  local REPO_ROOT="${ROOT_DIR%/.kstack}"
+  if [ "$REPO_ROOT" != "$ROOT_DIR" ] && [ -d "$REPO_ROOT/.git" ]; then
     local origin_url
-    origin_url="$(git -C "$INSTALL_ROOT" config --get remote.origin.url 2>/dev/null)"
+    origin_url="$(git -C "$REPO_ROOT" config --get remote.origin.url 2>/dev/null)"
     case "$origin_url" in
       *kubetail-org/kstack.git|*kubetail-org/kstack) ;;
       *) bail ;;
     esac
-    INSTALLED="$(git -C "$INSTALL_ROOT" describe --tags --exact-match HEAD 2>/dev/null)"
   fi
-
-  case "$INSTALLED" in
-    ""|main) bail ;;
-  esac
 
   mkdir -p "$CACHE_DIR" 2>/dev/null || true
 

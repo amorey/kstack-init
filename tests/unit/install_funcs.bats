@@ -29,7 +29,7 @@ render_h() {
   grep -F "agent: claude" "$OUT"
 }
 
-@test "render_skill substitutes INSTALL_ROOT and BIN_DIR" {
+@test "render_skill substitutes ROOT_DIR and BIN_DIR" {
   render demo claude /my/root /my/bin
   grep -F "install_root: /my/root" "$OUT"
   grep -F "bin_dir: /my/bin" "$OUT"

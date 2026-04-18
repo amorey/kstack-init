@@ -1,13 +1,13 @@
 # Skill templates
 
-Every kstack skill lives under `skills/<name>/` and is authored as a `SKILL.md.tmpl` file. The `install` script resolves placeholders into a concrete `SKILL.md` at install time and writes it into each agent's skill directory. `install` has two modes — repo-local (default; writes into `<repo>/.<agent>/skills/<name>/`) and global (`--global`; writes into `~/.<agent>/skills/kstack-<name>/` and installs helpers at `~/.config/kstack/bin/`).
+Every kstack skill lives under `skills/<name>/` and is authored as a `SKILL.md.tmpl` file. The `install` script resolves placeholders into a concrete `SKILL.md` at install time and writes it into each agent's skill directory. `install` has two modes — repo-local (default; writes into `<repo>/.<agent>/skills/<name>/` and materializes helpers at `<repo>/.kstack/bin/`) and global (`--global`; writes into `~/.<agent>/skills/kstack-<name>/` and installs helpers at `~/.config/kstack/bin/`).
 
 ## Placeholders
 
 | Placeholder         | Repo-local resolves to                           | Global resolves to                                   | Notes                                          |
 |---------------------|--------------------------------------------------|------------------------------------------------------|------------------------------------------------|
-| `{{INSTALL_ROOT}}`  | `<repo>`                                         | `~/.config/kstack`                                   | The root that owns `bin/` for this install     |
-| `{{BIN_DIR}}`       | `<repo>/bin`                                     | `~/.config/kstack/bin`                               | Stable absolute path to compiled helpers       |
+| `{{ROOT_DIR}}`      | `<repo>/.kstack`                                 | `~/.config/kstack`                                   | The install root (owns `bin/`, `lib/`, `cache/`) |
+| `{{BIN_DIR}}`       | `<repo>/.kstack/bin`                             | `~/.config/kstack/bin`                               | Stable absolute path to compiled helpers       |
 | `{{HELP_PATH}}`     | `<repo>/.<agent>/skills/<name>/references/help.md` | `~/.<agent>/skills/kstack-<name>/references/help.md` | Absolute path to this skill's rendered help page |
 | `{{SKILL_NAME}}`    | bare skill name                                  | bare skill name                                      | e.g. `cluster-status` (drives slash command)   |
 | `{{AGENT}}`         | `claude` / `codex` / …                           | `claude` / `codex` / …                               | Target agent                                   |
@@ -41,7 +41,7 @@ Cross-cutting prose that every skill needs (e.g. the global-flags contract) live
 name: {{SKILL_NAME}}
 description: <one-line outcome + differentiator>
 agent: {{AGENT}}
-install_root: {{INSTALL_ROOT}}
+install_root: {{ROOT_DIR}}
 bin_dir: {{BIN_DIR}}
 ---
 

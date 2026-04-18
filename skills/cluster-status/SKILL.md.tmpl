@@ -2,7 +2,7 @@
 name: {{SKILL_NAME}}
 description: Health snapshot (pod restarts, node conditions, resource pressure)
 agent: {{AGENT}}
-install_root: {{INSTALL_ROOT}}
+install_root: {{ROOT_DIR}}
 bin_dir: {{BIN_DIR}}
 ---
 
@@ -70,10 +70,24 @@ One finding per distinct problem per resource — do not double-count (e.g. a Cr
 ### Prose (default)
 
 1. Headline: `<N> findings — <C> critical, <W> warning, <I> info` followed by the context and namespace scope.
-2. Findings grouped by severity (critical → warning → info). Each finding on one line: `[severity] <kind>/<namespace>/<name> — <reason>: <one diagnostic fact>`. No YAML dumps.
-3. A single next-step hint pointing at `/investigate <kind>/<name>` for the highest-severity finding.
+2. **Nodes (`<N>`) table** — one row per node observed, always rendered. Substitute `<N>` with the total node count (e.g. `Nodes (5)`):
 
-On repeat runs within the same conversation, diff against the previous snapshot held in conversation context and report only the delta (new, resolved, severity-changed). Prefix the headline with `Δ`. If nothing changed, say so in one line.
+   | Node | Role | MemPressure | DiskPressure | PIDPressure | Ready | Schedulable | Notes |
+
+   `Role` is derived from `node-role.kubernetes.io/*` labels (`control-plane` or `worker`). Use `✓` / `✗` for boolean conditions (✓ = healthy — pressures false, Ready true, Schedulable true), `—` when unknown. `Notes` holds the highest-severity finding for that node (e.g. `critical: NotReady 8m`) or blank if healthy.
+
+3. **Workloads table** — one row per pod/workload finding, skip healthy ones:
+
+   | Severity | Kind | Namespace | Name | Reason | Detail |
+
+4. **PDBs table** — only rendered if any violations exist:
+
+   | Namespace | Name | Desired | Healthy | Detail |
+
+5. Pod phase summary as a single inline line: `Pods: 142 Running · 3 Pending · 1 Failed` (omit zero-count phases).
+6. Single next-step hint: `→ /investigate <kind>/<name>` for the highest-severity finding.
+
+Rows in the Workloads and PDBs tables are sorted critical → warning → info, then by namespace/name. Omit the Workloads or PDBs table entirely when it has no rows. On repeat runs within the same conversation, diff against the previous snapshot held in conversation context and prepend a `Δ` column to each table marking `+` (new), `−` (resolved), `~` (severity changed); prefix the headline with `Δ`. If nothing changed, say so in one line and skip the tables.
 
 ### JSON (`--json`)
 
