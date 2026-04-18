@@ -9,13 +9,14 @@ kstack is a **skill pack** (not an app) distributed to Claude Code and other age
 ## Commands
 
 - `./scripts/test.sh` — run the fast bats tiers (`tests/unit` + `tests/integration`). Requires `bats-core` (`brew install bats-core` / `apt install bats`). Pass `--all` to also run the e2e tier.
-- `./scripts/test-e2e.sh` — run the cluster-backed tier against a kind cluster named `kstack-test`. The fixture is managed by `tests/e2e/setup_suite.bash`; no prior `kind` state is required. Set `KSTACK_REUSE_CLUSTER=1` during dev loops to keep the cluster alive across runs. Requires `kind`, `kubectl`, and a running Docker daemon.
+- `./scripts/test-e2e.sh` — run the cluster-backed tier against a kind cluster named `kstack-test`. The kind lifecycle lives in `tests/e2e/lib/kind-cluster.sh` and is shared with the eval tier; the bats suite hook `tests/e2e/setup_suite.bash` is a thin wrapper around it. No prior `kind` state is required. Set `KSTACK_REUSE_CLUSTER=1` during dev loops to keep the cluster alive across runs. Requires `kind`, `kubectl`, and a running Docker daemon.
+- `./scripts/test-evals.sh` — run the eval tier: plants fixtures in the kind cluster, invokes skills via `claude -p`, and scores the responses. Requires `ANTHROPIC_API_KEY`, `claude`, `jq`, and `yq` in addition to the e2e prerequisites. Exits 0 with a skip message when `ANTHROPIC_API_KEY` is unset. Env: `KSTACK_EVAL_MAX_RUNS` (override samples per scenario), `KSTACK_EVAL_BUDGET_USD` (hard cost cap). Flags: `--scenario <id>` to run one, `--include-placeholder` to run the smoke scenario.
 - `bats tests/unit/<file>.bats` — run a single test file. Use `bats -f "<name pattern>" …` to run one test.
 - `./install` — render skills into `<repo>/.<agent>/skills/…` for every agent CLI detected on `PATH` (repo-local mode).
 - `./install --global` — clone/update `~/.config/kstack/src/` at the latest release tag and render into `~/.<agent>/skills/kstack-<skill>/…`. Do **not** use the invoker's checkout as the source in global mode; it always pulls canonical upstream.
 - `./scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
 
-CI (`.github/workflows/ci.yml`) runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. A separate `bats-e2e` job runs `scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check.
+CI (`.github/workflows/ci.yml`) runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. A separate `bats-e2e` job runs `scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check. An `evals` job runs `scripts/test-evals.sh` but is `workflow_dispatch`-only — trigger it manually via `gh workflow run ci.yml`.
 
 ## Architecture
 
@@ -54,7 +55,8 @@ Per-context cache + learned state live under `~/.config/kstack/{cache,state}/` (
 
 - `tests/unit/` — sourced-function tests (e.g. `agents.bats` sources `lib/agents.sh`).
 - `tests/integration/` — end-to-end CLI tests that build a fake kstack checkout under `$BATS_TEST_TMPDIR` and run `install` against it with an isolated `$HOME`. See `tests/test_helper.bash` (`common_setup`, `use_mocks`, `write_stub`).
-- `tests/e2e/` — cluster-backed tests. `tests/e2e/setup_suite.bash` owns the kind cluster lifecycle via bats' `setup_suite`/`teardown_suite` hooks; tests inherit `KUBECONFIG` and talk to the cluster directly. Only fires under `scripts/test-e2e.sh` — never under `scripts/test.sh`.
+- `tests/e2e/` — cluster-backed tests. `tests/e2e/lib/kind-cluster.sh` owns the kind lifecycle (shared with the eval tier); `tests/e2e/setup_suite.bash` is the bats `setup_suite`/`teardown_suite` wrapper. Tests inherit `KUBECONFIG` and talk to the cluster directly. Only fires under `scripts/test-e2e.sh` — never under `scripts/test.sh`.
+- `tests/evals/` — skill evaluation scenarios. Each `scenarios/<id>/` is a self-contained package: `scenario.yaml` (metadata + claude flags), `fixture.yaml` (kubectl manifests), `prompt.txt` (user turn), `expected.yaml` (keyword/structured/judge rubric), optional `wait.sh`. Runner libs live under `tests/evals/lib/` and are driven by `scripts/test-evals.sh`. Artifacts (transcripts, judge outputs, state snapshots) land under `tests/evals/artifacts/<id>/` and are gitignored. See `tests/evals/README.md` for the full authoring guide.
 - `tests/fixtures/` — minimal skill + partial fixtures used by integration tests (so tests aren't coupled to real skill contents).
 
 When adding a helper under `bin/` or a partial under `skills/_partials/`, add a test that exercises it through `install`, not just via direct invocation — the rendering pipeline is where most regressions land.

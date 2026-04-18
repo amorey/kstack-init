@@ -17,10 +17,10 @@ Overall plan from README-finished to v0.1.0 launch. Grouped by phase; within eac
 
 ## Pilot skill + testing
 
-- [ ] Scaffold `/cluster-status` as the pattern-setter for all other skills
-- [ ] Build kind fixture harness — clusters with planted failures (crashloop pod, overbroad RBAC, missing NetworkPolicy, outdated image); runner invokes skills headlessly and asserts output mentions planted symptoms
-- [ ] Write first eval scenario for `/cluster-status`
-- [ ] CI — run evals and script tests on PRs
+- [ ] Scaffold `/cluster-status` as the pattern-setter for all other skills (includes defining its `--json` output schema, which the first eval scenario will assert against)
+- [x] Build eval harness — scenario-driven runner (`scripts/test-evals.sh`) that plants fixtures in the kind cluster, invokes skills via `claude -p`, and scores responses via keyword + structured JSON + LLM-as-judge. Placeholder smoke scenario lands with the harness; real scenarios follow per-skill.
+- [ ] Write first eval scenario for `/cluster-status` (`cluster-status-crashloop`) — blocked on the skill landing with a `--json` schema
+- [x] CI — `evals` job added (`workflow_dispatch`-only for now; graduate to PR label / nightly cron once scenarios stabilize)
 
 ## Remaining skills
 

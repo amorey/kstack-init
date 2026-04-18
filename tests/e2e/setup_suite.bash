@@ -9,52 +9,26 @@
 #   KSTACK_KIND_CLUSTER   name of the kind cluster (default: kstack-test)
 #   KSTACK_REUSE_CLUSTER  if =1, adopt an existing cluster and skip teardown
 
-KSTACK_KIND_CLUSTER="${KSTACK_KIND_CLUSTER:-kstack-test}"
-
-_kstack_require_cmd() {
-  command -v "$1" >/dev/null 2>&1
-}
+_E2E_SUITE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kind-cluster.sh
+. "$_E2E_SUITE_DIR/lib/kind-cluster.sh"
 
 setup_suite() {
-  local missing=()
-  for cmd in kind kubectl docker; do
-    if ! _kstack_require_cmd "$cmd"; then
-      missing+=("$cmd")
-    fi
-  done
-
-  if [ "${#missing[@]}" -gt 0 ]; then
+  if ! kstack_kind_check_prereqs 2>&3; then
     if declare -F skip_suite >/dev/null 2>&1; then
-      skip_suite "missing required commands: ${missing[*]}"
+      skip_suite "missing required commands for e2e tier"
     else
-      echo "# e2e suite requires ${missing[*]} on PATH — skipping" >&3
       export KSTACK_E2E_SKIP=1
       return 0
     fi
   fi
 
-  if kind get clusters 2>/dev/null | grep -qx "$KSTACK_KIND_CLUSTER"; then
-    echo "# adopting existing kind cluster: $KSTACK_KIND_CLUSTER" >&3
-  else
-    echo "# creating kind cluster: $KSTACK_KIND_CLUSTER" >&3
-    kind create cluster --name "$KSTACK_KIND_CLUSTER" --wait 90s >&3 2>&1
-  fi
-
-  export KUBECONFIG="$BATS_SUITE_TMPDIR/kubeconfig"
-  kind get kubeconfig --name "$KSTACK_KIND_CLUSTER" > "$KUBECONFIG"
-  export KSTACK_KIND_CLUSTER
+  kstack_kind_up "$BATS_SUITE_TMPDIR/kubeconfig" 2>&3
 }
 
 teardown_suite() {
   if [ "${KSTACK_E2E_SKIP:-0}" = "1" ]; then
     return 0
   fi
-  if [ "${KSTACK_REUSE_CLUSTER:-0}" = "1" ]; then
-    echo "# KSTACK_REUSE_CLUSTER=1 — leaving $KSTACK_KIND_CLUSTER running" >&3
-    return 0
-  fi
-  if _kstack_require_cmd kind; then
-    echo "# deleting kind cluster: $KSTACK_KIND_CLUSTER" >&3
-    kind delete cluster --name "$KSTACK_KIND_CLUSTER" >&3 2>&1 || true
-  fi
+  kstack_kind_down 2>&3
 }
