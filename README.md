@@ -13,7 +13,7 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 
 ## Introduction
 
-**Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart, fast, and cost-effective way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process node-level data at the source before sending it back to Claude for analysis. This makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium).
+**Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart and efficient way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process node-level data at the source before sending it back to Claude for analysis which makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium) which makes Claude more capable.
 
 Once you install kstack you'll have access to these K8s commands inside Claude Code:
 
@@ -33,6 +33,10 @@ Once you install kstack you'll have access to these K8s commands inside Claude C
 * `/audit-cost` — Requests vs. usage, over-provisioning, idle capacity
 * `/audit-outdated` — Outdated services, known CVEs, available version bumps
 
+**Maintenance**
+* `/cleanup-cluster` — Remove all kstack-owned resources from the cluster (debug containers, pod clones, watcher jobs)
+* `/forget` — Clear kstack's local cache and discard what it learned about your cluster(s)
+
 Our goal is to bring the power of AI to K8s monitoring in a user-friendly and cost-effective way that keeps you in control. If you notice a bug or have a suggestion please create a GitHub Issue or send us an email (hello@kubetail.com)!
 
 ## Quickstart
@@ -43,7 +47,7 @@ To install kstack globally so you can use the skills from a Claude Code session 
 curl -sS https://www.kubestack.xyz/install.sh | bash
 ```
 
-This will run a bootstrap script that installs the kstack skills into your user-level skills directory (e.g. `~/.claude/skills`) with names prefixed with `/kstack-*`. It will detect all available agents and install into each of their skills directories (e.g. Codex, OpenCode). After installation, the skills will be available when you start a session in an project:
+This will run a bootstrap script that installs the kstack skills into your Claude user-level skills directory (e.g. `~/.claude/skills`) with names prefixed with `/kstack-*`. By default, it will detect other available agents (e.g. Codex, OpenCode) and install into each of their skills directories as well. After installation, the skills will be available when you start a session in any project:
 
 ```console
 ──────────────────────────────────────────────────
@@ -328,6 +332,68 @@ Outdated cluster components, known CVEs, and available version bumps.
 - `--target-version <ver>` — "if I upgraded to K8s X.Y, what would break?" mode
 - `--include-prereleases` — surface alpha/beta upstream versions
 - `--fix` — emit updated manifests/values files with new versions pinned
+
+</dd>
+</dl>
+
+---
+
+### Maintenance
+
+<dl>
+<dt>
+
+#### `/cleanup-cluster`
+
+</dt>
+<dd>
+
+Remove all kstack-managed resources from the cluster.
+
+**What it removes:** anything labeled `kstack.kubetail.com/owned-by=true` — ephemeral debug containers from `/exec`, pod clones created with `--copy-to`, watcher Jobs and ConfigMaps from `/watch`, toolbox pods, and any temporary RBAC bindings kstack created for them. Resources you authored by hand are never touched, even if they live in the same namespace.
+
+**Labels kstack writes** on every resource it creates (these power the filter flags below):
+- `kstack.kubetail.com/owned-by=true` — the cleanup selector; presence of this label is what makes a resource a candidate
+- `kstack.kubetail.com/skill=<exec|watch|...>` — which kstack skill created the resource (powers `--skill`)
+- `kstack.kubetail.com/session=<id>` — the Claude Code session that created it (powers `--session` / `--this-session`)
+- `kstack.kubetail.com/created-at=<rfc3339>` — creation timestamp written by kstack itself, since `metadata.creationTimestamp` can be rewritten by admission controllers (powers `--older-than`)
+
+**How it works:** a single label-selector `kubectl get` across all namespaces builds the candidate list. Claude prints the full list (kind/namespace/name + age + session) and waits for confirmation before issuing deletes. Deletes run with `--wait=false` so a single stuck finalizer can't block the rest of the cleanup; anything that fails to terminate is reported back so you can intervene.
+
+**Scope:** operates on the current kubeconfig context only. To clean up multiple clusters, run it once per context (use the global `--context <ctx>` flag, or switch contexts between runs). To clean up all clusters, use the `--all-clusters` flag.
+
+**Options:**
+- `--all-clusters` - cleanup resources on all clusters listed in kubeconfig
+- `--namespace <n>` — restrict cleanup to one namespace (default: cluster-wide)
+- `--this-session` — restrict to resources created by the current Claude Code session, useful for tearing down scratch state at the end of a debugging run without touching anything from earlier sessions
+- `--session <id>` — restrict to a specific session id (run `/cleanup-cluster --list-sessions` to see all sessions with surviving resources in the cluster)
+- `--older-than <duration>` — only delete resources older than N (e.g. `--older-than 24h`), useful for periodic cron-style cleanup
+- `--skill <name>` — restrict to resources created by a specific kstack skill (e.g. `--skill exec`)
+- `--yes` — skip the confirmation prompt (for scripts/CI)
+
+</dd>
+<dt>
+
+#### `/forget`
+
+</dt>
+<dd>
+
+Clear kstack's local cache and discard what it learned about your cluster(s).
+
+**What it clears:**
+- **Local cache:** recent query results, log buffers, dedup tables, and in-flight watcher state under `~/.config/kstack/cache/`
+- **Learned state:** detected integrations (Cilium, Istio, Kyverno, OpenCost, etc.), cluster fingerprints, baseline metrics, and per-context preferences under `~/.config/kstack/state/`
+
+**Scope:** cache and learned state are partitioned per kubeconfig context, so by default `/forget` only clears entries tied to the current context — forgetting `staging` never affects `prod`. Use `--context <ctx>` (global flag) to target a different cluster, or `--all-clusters` to wipe every context kstack has ever recorded on this machine. This skill never touches the cluster itself; for that, use `/cleanup-cluster`.
+
+**When to run it:** after a cluster is rebuilt or migrated (so kstack stops trusting stale fingerprints), when a detected integration is uninstalled, or when you simply want kstack to re-learn from scratch on its next run.
+
+**Options:**
+- `--scope <cache|learned|all>` — narrow the reset (default `all`)
+- `--all-clusters` — clear entries for every context kstack has stored, not just the current one
+- `--older-than <duration>` — only clear entries older than N (e.g. `--older-than 30d`)
+- `--yes` — skip the confirmation prompt (for scripts/CI)
 
 </dd>
 </dl>
