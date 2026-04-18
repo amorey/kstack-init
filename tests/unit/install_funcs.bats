@@ -15,8 +15,8 @@ setup() {
 }
 
 render() {
-  local skill_dir="${5:-/install/path}"
-  render_skill "$1" "$2" "$3" "$4" "$skill_dir" "$OUT" "$SKILLS_SRC" "$GF" "$UC"
+  local skill_dir="${4:-/install/path}"
+  render_skill "$1" "$2" "$3" "$skill_dir" "$OUT" "$SKILLS_SRC" "$GF" "$UC"
 }
 
 render_h() {
@@ -24,41 +24,41 @@ render_h() {
 }
 
 @test "render_skill substitutes SKILL_NAME and AGENT" {
-  render demo claude /root /bin
+  render demo claude /root
   grep -F "name: kstack-demo" "$OUT"
   grep -F "agent: claude" "$OUT"
 }
 
-@test "render_skill substitutes ROOT_DIR and BIN_DIR" {
-  render demo claude /my/root /my/bin
+@test "render_skill substitutes ROOT_DIR" {
+  render demo claude /my/root
   grep -F "install_root: /my/root" "$OUT"
-  grep -F "bin_dir: /my/bin" "$OUT"
+  grep -F "bin_dir: /my/root/bin" "$OUT"
 }
 
 @test "render_skill substitutes SKILL_DIR" {
-  render demo claude /root /bin /skills/demo
+  render demo claude /root /skills/demo
   grep -F "skill_dir: /skills/demo" "$OUT"
 }
 
 @test "render_skill inlines both partials" {
-  render demo claude /root /bin
+  render demo claude /root
   grep -F "does one thing" "$OUT"
   grep -F "check-update at session start" "$OUT"
 }
 
-@test "render_skill expands BIN_DIR inside update-check partial" {
-  render demo claude /root /opt/kstack/bin
+@test "render_skill expands ROOT_DIR inside update-check partial" {
+  render demo claude /opt/kstack
   grep -F "Run /opt/kstack/bin/check-update" "$OUT"
 }
 
 @test "render_skill leaves no raw template markers" {
-  render demo claude /root /bin
+  render demo claude /root
   ! grep -F '{{' "$OUT"
 }
 
 @test "render_skill creates output parent dir" {
   OUT="$TMPDIR_TEST/out/nested/sub/SKILL.md"
-  render demo claude /root /bin
+  render demo claude /root
   [ -f "$OUT" ]
 }
 

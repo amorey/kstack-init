@@ -85,18 +85,17 @@ ensure_src_checkout() {
   write_install_conf "$KSTACK_CONFIG_DIR" "$tag"
 }
 
-# render_skill $skill $agent $root_dir $bin_dir $skill_dir $out_file $skills_src $global_flags_partial $update_check_partial
+# render_skill $skill $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $update_check_partial
 render_skill() {
-  local skill="$1" agent="$2" root_dir="$3" bin_dir="$4" skill_dir="$5" out_file="$6"
-  local skills_src="$7" gf="$8" uc="$9"
+  local skill="$1" agent="$2" root_dir="$3" skill_dir="$4" out_file="$5"
+  local skills_src="$6" gf="$7" uc="$8"
   mkdir -p "$(dirname "$out_file")"
   awk -v gf="$gf" -v uc="$uc" \
-      -v root_dir="$root_dir" -v bin_dir="$bin_dir" \
+      -v root_dir="$root_dir" \
       -v skill_dir="$skill_dir" \
       -v skill="$skill" -v agent="$agent" '
     function subst(s) {
       gsub(/\{\{ROOT_DIR\}\}/,     root_dir,  s)
-      gsub(/\{\{BIN_DIR\}\}/,      bin_dir,   s)
       gsub(/\{\{SKILL_DIR\}\}/,    skill_dir, s)
       gsub(/\{\{SKILL_NAME\}\}/,   skill,     s)
       gsub(/\{\{AGENT\}\}/,        agent,     s)
@@ -174,11 +173,11 @@ prune_orphans() {
   done
 }
 
-# install_agent $mode $agent $root_dir $bin_dir $skills_dir $slot_prefix
+# install_agent $mode $agent $root_dir $skills_dir $slot_prefix
 #   $mode is "local" or "global" — used for log text only.
 #   $slot_prefix is "" for local, "kstack-" for global.
 install_agent() {
-  local mode="$1" agent="$2" root_dir="$3" bin_dir="$4" skills_dir="$5" slot_prefix="$6"
+  local mode="$1" agent="$2" root_dir="$3" skills_dir="$4" slot_prefix="$5"
   mkdir -p "$skills_dir"
 
   local slots="" skill slot out_dir out_file help_file
@@ -194,7 +193,7 @@ install_agent() {
     [ -L "$out_file" ] && rm -f "$out_file"
     [ -L "$help_file" ] && rm -f "$help_file"
     mkdir -p "$out_dir"
-    render_skill "$skill" "$agent" "$root_dir" "$bin_dir" "$out_dir" "$out_file" \
+    render_skill "$skill" "$agent" "$root_dir" "$out_dir" "$out_file" \
       "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"
     render_help "$skill" "$SRC_ROOT/README.md" "$help_file"
     copy_skill_scripts "$SKILLS_SRC/$skill/scripts" "$out_dir/scripts"
@@ -318,7 +317,6 @@ main() {
     SRC_ROOT="$SCRIPT_DIR"
     ROOT_DIR="$SCRIPT_DIR/.kstack"
   fi
-  BIN_DIR="$ROOT_DIR/bin"
   LIB_DIR="$ROOT_DIR/lib"
 
   SKILLS_SRC="$SRC_ROOT/skills"
@@ -351,21 +349,21 @@ main() {
   done
 
   mkdir -p "$ROOT_DIR/cache"
-  copy_bin "$SRC_ROOT/bin" "$BIN_DIR"
+  copy_bin "$SRC_ROOT/bin" "$ROOT_DIR/bin"
   copy_lib "$SRC_ROOT/lib" "$LIB_DIR"
 
   if [ "$GLOBAL" -eq 1 ]; then
     log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
     # install.conf is written by ensure_src_checkout.
     for h in $TARGET_AGENTS; do
-      install_agent global "$h" "$ROOT_DIR" "$BIN_DIR" \
+      install_agent global "$h" "$ROOT_DIR" \
         "$(agent_skills_dir_global "$h")" "kstack-"
     done
   else
     log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
     write_local_install_conf "$ROOT_DIR" "$SRC_ROOT"
     for h in $TARGET_AGENTS; do
-      install_agent local "$h" "$ROOT_DIR" "$BIN_DIR" \
+      install_agent local "$h" "$ROOT_DIR" \
         "$(agent_skills_dir_local "$SCRIPT_DIR" "$h")" ""
     done
   fi
@@ -373,10 +371,10 @@ main() {
   log ""
   log "kstack installed. Start a session with your agent to use the skills."
   if [ "$GLOBAL" -eq 1 ]; then
-    log "To upgrade:   $BIN_DIR/upgrade"
-    log "To uninstall: $BIN_DIR/uninstall"
+    log "To upgrade:   $ROOT_DIR/bin/upgrade"
+    log "To uninstall: $ROOT_DIR/bin/uninstall"
   else
-    log "To upgrade:   git pull && ./install  (or $BIN_DIR/upgrade)"
+    log "To upgrade:   git pull && ./install  (or $ROOT_DIR/bin/upgrade)"
     log "To uninstall: delete this kstack repo directory."
   fi
 }

@@ -7,7 +7,6 @@ Every kstack skill lives under `skills/<name>/` and is authored as a `SKILL.md.t
 | Placeholder         | Repo-local resolves to                           | Global resolves to                                   | Notes                                          |
 |---------------------|--------------------------------------------------|------------------------------------------------------|------------------------------------------------|
 | `{{ROOT_DIR}}`      | `<repo>/.kstack`                                 | `~/.config/kstack`                                   | The install root (owns `bin/`, `lib/`, `cache/`) |
-| `{{BIN_DIR}}`       | `<repo>/.kstack/bin`                             | `~/.config/kstack/bin`                               | Stable absolute path to compiled helpers       |
 | `{{SKILL_DIR}}`     | `<repo>/.<agent>/skills/<name>`                  | `~/.<agent>/skills/kstack-<name>`                    | Absolute path to the rendered skill slot (owns `references/`, `scripts/`) |
 | `{{SKILL_NAME}}`    | bare skill name                                  | bare skill name                                      | e.g. `cluster-status` (drives slash command)   |
 | `{{AGENT}}`         | `claude` / `codex` / …                           | `claude` / `codex` / …                               | Target agent                                   |
@@ -19,7 +18,7 @@ Every kstack skill lives under `skills/<name>/` and is authored as a `SKILL.md.t
 1. `SKILL.md.tmpl` is the source of truth. `SKILL.md` is generated — never edit it by hand.
 2. `install` inlines any partials, then runs literal `sed`-style substitution of the scalar placeholders, and writes the resolved `SKILL.md` directly into the agent's skill directory (no intermediate dist/ dir, no symlinks). Repo-local writes to `<repo>/.<agent>/skills/<name>/SKILL.md`; global writes to `~/.<agent>/skills/kstack-<name>/SKILL.md`.
 3. Agent install paths come from the table in the top-level `README.md`.
-4. When a skill body shells out to a compiled helper, use `{{BIN_DIR}}/<tool>` so the absolute path is baked in at install time.
+4. When a skill body shells out to a compiled helper, use `{{ROOT_DIR}}/bin/<tool>` so the absolute path is baked in at install time.
 5. Repo-local install artifacts (`<repo>/.<agent>/skills/<name>/`) are gitignored — only `.tmpl` sources are tracked.
 6. For each skill, `install` renders `references/help.md` (next to `SKILL.md`) from the top-level `README.md`'s per-skill `<dt>/<dd>` section plus the global-flags table. The file ends with the literal line `=== END HELP ===`. The `{{GLOBAL_FLAGS}}` partial instructs the skill to `cat {{SKILL_DIR}}/references/help.md` on `--help` and to treat the sentinel as end-of-turn. Every skill directory listed in `skills/` must have a matching section in the top-level `README.md`; `install` aborts otherwise. The `references/` and (future) `scripts/` subdirectories follow Anthropic's recommended skill layout — auxiliary files the agent loads on demand, kept out of the main `SKILL.md`.
 
@@ -32,7 +31,7 @@ Cross-cutting prose that every skill needs (e.g. the global-flags contract) live
 - Current partials:
   - `_partials/global-flags.md` → `{{GLOBAL_FLAGS}}` (the four global flags documented in the top-level `README.md`).
   - `_partials/update-check.md` → `{{UPDATE_CHECK}}` (instructs the agent to run `bin/check-update`, `bin/upgrade`, `bin/dismiss-update` on the user's behalf).
-- Partials are kept placeholder-free. If a future partial needs `{{BIN_DIR}}` etc., that's fine — scalar substitution runs after the inline, so they resolve normally.
+- Partials are kept placeholder-free. If a future partial needs `{{ROOT_DIR}}` etc., that's fine — scalar substitution runs after the inline, so they resolve normally.
 
 ## Minimum template shape
 
@@ -42,7 +41,7 @@ name: {{SKILL_NAME}}
 description: <one-line outcome + differentiator>
 agent: {{AGENT}}
 install_root: {{ROOT_DIR}}
-bin_dir: {{BIN_DIR}}
+bin_dir: {{ROOT_DIR}}/bin
 ---
 
 {{UPDATE_CHECK}}

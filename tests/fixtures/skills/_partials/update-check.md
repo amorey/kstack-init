@@ -1,1 +1,1 @@
-Run {{BIN_DIR}}/check-update at session start.
+Run {{ROOT_DIR}}/bin/check-update at session start.

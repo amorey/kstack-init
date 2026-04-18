@@ -24,12 +24,12 @@ CI (`.github/workflows/ci.yml`) runs four jobs. `lint` shellchecks `install`, ev
 
 Skills are authored as `skills/<name>/SKILL.md.tmpl`. The `install` script renders each skill slot in two passes:
 
-1. **`render_skill`** — inlines partials at `{{GLOBAL_FLAGS}}` and `{{UPDATE_CHECK}}` markers from `skills/_partials/`, then substitutes scalar placeholders `{{ROOT_DIR}}`, `{{BIN_DIR}}`, `{{SKILL_DIR}}`, `{{SKILL_NAME}}`, `{{AGENT}}`. Writes the resolved `SKILL.md` into the agent-specific skills dir (no intermediate dist/).
+1. **`render_skill`** — inlines partials at `{{GLOBAL_FLAGS}}` and `{{UPDATE_CHECK}}` markers from `skills/_partials/`, then substitutes scalar placeholders `{{ROOT_DIR}}`, `{{SKILL_DIR}}`, `{{SKILL_NAME}}`, `{{AGENT}}`. Writes the resolved `SKILL.md` into the agent-specific skills dir (no intermediate dist/).
 2. **`render_help`** — extracts the `<dt>/<dd>` block for `#### /<skill>` from `README.md`, appends the `**Global flags**` section, and terminates the file with the literal sentinel `=== END HELP ===`. Output goes to `<skill-slot>/references/help.md` (reachable via `{{SKILL_DIR}}/references/help.md` in templates). The `--help` flag in the global-flags partial is wired to `cat` this file and stop on the sentinel, so every skill gets a consistent help page sourced from the README.
 
 `SKILL.md.tmpl` and the README section are the sources of truth — rendered `SKILL.md` and `references/help.md` files are gitignored and must never be hand-edited. Cross-cutting prose (global flags, update notices) belongs in a partial, not duplicated into every skill. A new skill needs both a `SKILL.md.tmpl` and a matching `#### /<skill>` section in `README.md`, or `render_help` will exit non-zero during install.
 
-When a skill body needs to invoke a helper, reference it as `{{BIN_DIR}}/<tool>` so the absolute path is baked in at render time (this is how the same template works under repo-local and global installs).
+When a skill body needs to invoke a helper, reference it as `{{ROOT_DIR}}/bin/<tool>` so the absolute path is baked in at render time (this is how the same template works under repo-local and global installs).
 
 ### Agent table (lib/agents.sh)
 
@@ -39,8 +39,8 @@ When a skill body needs to invoke a helper, reference it as `{{BIN_DIR}}/<tool>`
 
 Both modes materialize a symmetric `{{ROOT_DIR}}/{bin,lib,cache}/` layout — the only differences are where `{{ROOT_DIR}}` sits and which skills dir the rendered `SKILL.md` files land in.
 
-- **Repo-local** (`./install`): copies `bin/` → `<repo>/.kstack/bin/` and `lib/` → `<repo>/.kstack/lib/` (recursive — per-skill helper trees at `lib/<skill>/` are supported), writes `<repo>/.kstack/install.conf` from `git describe --tags --exact-match HEAD` (or current branch name), and renders skills into `<repo>/.<agent>/skills/<name>/SKILL.md`. `{{ROOT_DIR}}` = `<repo>/.kstack`, `{{BIN_DIR}}` = `<repo>/.kstack/bin`. Upgrade via `git pull && ./install` or `<repo>/.kstack/bin/upgrade`.
-- **Global** (`./install --global`): maintains `~/.config/kstack/src/` at the latest `v*` tag, copies `bin/` → `~/.config/kstack/bin/` and `lib/` → `~/.config/kstack/lib/` (recursive), renders into `~/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `~/.config/kstack`, `{{BIN_DIR}}` = `~/.config/kstack/bin`. Upgrade via `~/.config/kstack/bin/upgrade`.
+- **Repo-local** (`./install`): copies `bin/` → `<repo>/.kstack/bin/` and `lib/` → `<repo>/.kstack/lib/` (recursive — per-skill helper trees at `lib/<skill>/` are supported), writes `<repo>/.kstack/install.conf` from `git describe --tags --exact-match HEAD` (or current branch name), and renders skills into `<repo>/.<agent>/skills/<name>/SKILL.md`. `{{ROOT_DIR}}` = `<repo>/.kstack`. Upgrade via `git pull && ./install` or `<repo>/.kstack/bin/upgrade`.
+- **Global** (`./install --global`): maintains `~/.config/kstack/src/` at the latest `v*` tag, copies `bin/` → `~/.config/kstack/bin/` and `lib/` → `~/.config/kstack/lib/` (recursive), renders into `~/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `~/.config/kstack`. Upgrade via `~/.config/kstack/bin/upgrade`.
 
 The `bin/` helpers (`check-update`, `upgrade`, `uninstall`, `dismiss-update`) assume they sit at `{{ROOT_DIR}}/bin/<name>` and derive `ROOT_DIR` as `dirname "$SCRIPT_DIR"`. Running a helper directly from the source tree (`./bin/check-update`) without installing first is unsupported — paths resolve to the repo root rather than `.kstack/`. Keep that invariant when adding helpers.
 

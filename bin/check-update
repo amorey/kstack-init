@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kstack check-update — cached check for a newer kstack release.
 #
-# Invoked by agents (Claude, etc.) from skill preambles via {{BIN_DIR}}/check-update.
+# Invoked by agents (Claude, etc.) from skill preambles via {{ROOT_DIR}}/bin/check-update.
 # Never fails — offline, missing deps, or unknown state all exit silently so a
 # failing check cannot break skill invocation.
 #
