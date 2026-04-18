@@ -8,6 +8,9 @@ setup() {
   SNAP="$REPO_ROOT/skills/cluster-status/scripts/snapshot"
   FIX="$FIXTURES_DIR/kubectl"
   export KSTACK_ROOT="$REPO_ROOT"
+  # Pin clock to a fixed time near the fixture timestamps so tests are
+  # deterministic regardless of wall-clock drift.
+  export KSTACK_NOW="2026-04-18T12:00:00Z"
 }
 
 # write_kubectl_stub — respond to each kubectl subcommand with the matching

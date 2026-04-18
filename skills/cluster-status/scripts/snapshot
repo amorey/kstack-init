@@ -79,7 +79,7 @@ main() {
   local mode="prose"
   [ "$JSON" -eq 1 ] && mode="json"
   local now
-  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  now="${KSTACK_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
   local jq_raw_flag="-nr"
   [ "$mode" = "json" ] && jq_raw_flag="-n"
