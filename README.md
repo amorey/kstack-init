@@ -59,7 +59,7 @@ Alternatively, to use kstack locally without modifying your global skills you ca
 
 ```console
 git clone https://github.com/kubetail-org/kstack.git
-cd kstack && ./install && claude
+cd kstack && ./install
 ```
 
 `install` renders the skills into `.claude/skills/` (and the equivalent dir for any other agent CLI detected on your `PATH`), so they're discoverable the moment you start a session from the repo:
