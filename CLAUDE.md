@@ -16,19 +16,18 @@ kstack is a **skill pack** (not an app) distributed to Claude Code and other age
 - `./install --global` — clone/update `~/.config/kstack/src/` at the latest release tag and render into `~/.<agent>/skills/kstack-<skill>/…`. Do **not** use the invoker's checkout as the source in global mode; it always pulls canonical upstream.
 - `./scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
 
-CI (`.github/workflows/ci.yml`) runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. A separate `bats-e2e` job runs `scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check. An `evals` job runs `scripts/test-evals.sh` but is `workflow_dispatch`-only — trigger it manually via `gh workflow run ci.yml`.
+CI (`.github/workflows/ci.yml`) runs four jobs. `lint` shellchecks `install`, every script under `bin/`, `lib/`, and `scripts/`, plus `tests/test_helper.bash` (severity=warning, external-sources on). `bats` runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. `bats-e2e` runs `scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check. `evals` runs `scripts/test-evals.sh` but is `workflow_dispatch`-only — trigger it manually via `gh workflow run ci.yml`.
 
 ## Architecture
 
 ### Templates → SKILL.md rendering
 
-Skills are authored as `skills/<name>/SKILL.md.tmpl`. The `install` script:
+Skills are authored as `skills/<name>/SKILL.md.tmpl`. The `install` script renders each skill slot in two passes:
 
-1. Inlines partials at `{{GLOBAL_FLAGS}}` and `{{UPDATE_CHECK}}` markers from `skills/_partials/`.
-2. Substitutes scalar placeholders: `{{INSTALL_ROOT}}`, `{{BIN_DIR}}`, `{{SKILL_NAME}}`, `{{AGENT}}`.
-3. Writes the resolved `SKILL.md` into the agent-specific skills dir (no intermediate dist/).
+1. **`render_skill`** — inlines partials at `{{GLOBAL_FLAGS}}` and `{{UPDATE_CHECK}}` markers from `skills/_partials/`, then substitutes scalar placeholders `{{INSTALL_ROOT}}`, `{{BIN_DIR}}`, `{{HELP_PATH}}`, `{{SKILL_NAME}}`, `{{AGENT}}`. Writes the resolved `SKILL.md` into the agent-specific skills dir (no intermediate dist/).
+2. **`render_help`** — extracts the `<dt>/<dd>` block for `#### /<skill>` from `README.md`, appends the `**Global flags**` section, and terminates the file with the literal sentinel `=== END HELP ===`. Output goes to `<skill-slot>/references/help.md`, and its absolute path is what `{{HELP_PATH}}` resolves to. The `--help` flag in the global-flags partial is wired to `cat` this file and stop on the sentinel, so every skill gets a consistent help page sourced from the README.
 
-`SKILL.md.tmpl` is the source of truth — rendered `SKILL.md` files are gitignored and must never be hand-edited. Cross-cutting prose (global flags, update notices) belongs in a partial, not duplicated into every skill.
+`SKILL.md.tmpl` and the README section are the sources of truth — rendered `SKILL.md` and `references/help.md` files are gitignored and must never be hand-edited. Cross-cutting prose (global flags, update notices) belongs in a partial, not duplicated into every skill. A new skill needs both a `SKILL.md.tmpl` and a matching `#### /<skill>` section in `README.md`, or `render_help` will exit non-zero during install.
 
 When a skill body needs to invoke a helper, reference it as `{{BIN_DIR}}/<tool>` so the absolute path is baked in at render time (this is how the same template works under repo-local and global installs).
 
