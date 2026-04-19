@@ -19,6 +19,6 @@ setup() {
   common_setup
 }
 
-@test "snapshot script exists and is executable" {
-  [ -x "$SRC_ROOT/skills/cluster-status/scripts/snapshot" ]
+@test "main script exists and is executable" {
+  [ -x "$SRC_ROOT/skills/cluster-status/scripts/main" ]
 }

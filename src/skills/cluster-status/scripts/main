@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# cluster-status/scripts/snapshot — placeholder.
-# The real implementation lands in a follow-up PR.
-set -eu
+# cluster-status/scripts/main — placeholder.
+# The real implementation lands in a follow-up PR. Exits 10 so the entrypoint
+# treats the output as a terminal response (Claude prints stdout and stops).
+set -u
 echo "cluster-status is not yet implemented."
+exit 10

@@ -11,7 +11,7 @@ Every kstack skill lives under `skills/<name>/` and is authored as a `SKILL.md.t
 | `{{SKILL_NAME}}`    | bare skill name                                  | bare skill name                                      | e.g. `cluster-status` (drives slash command)   |
 | `{{AGENT}}`         | `claude` / `codex` / …                           | `claude` / `codex` / …                               | Target agent                                   |
 | `{{GLOBAL_FLAGS}}`  | inlined partial content                          | inlined partial content                              | See Partials                                   |
-| `{{UPDATE_CHECK}}`  | inlined partial content                          | inlined partial content                              | See Partials                                   |
+| `{{ENTRYPOINT}}`    | inlined partial content                          | inlined partial content                              | See Partials                                   |
 
 ## Rules
 
@@ -30,7 +30,7 @@ Cross-cutting prose that every skill needs (e.g. the global-flags contract) live
 - Each partial is referenced from a `SKILL.md.tmpl` via a `{{NAME}}` marker on its own line. `install` replaces the marker with the file's verbatim contents before running scalar substitutions.
 - Current partials:
   - `_partials/global-flags.md` → `{{GLOBAL_FLAGS}}` (the four global flags documented in the top-level `README.md`).
-  - `_partials/update-check.md` → `{{UPDATE_CHECK}}` (instructs the agent to run `bin/check-update`, `bin/upgrade`, `bin/dismiss-update` on the user's behalf).
+  - `_partials/entrypoint.md` → `{{ENTRYPOINT}}` (directs the agent to invoke `bin/entrypoint` as its first action every turn — shared preamble that runs the update check, handles `--help`, and optionally dispatches to `{{SKILL_DIR}}/scripts/main`; also covers the NL handling for "upgrade kstack" / "dismiss").
 - Partials are kept placeholder-free. If a future partial needs `{{ROOT_DIR}}` etc., that's fine — scalar substitution runs after the inline, so they resolve normally.
 
 ## Minimum template shape
@@ -44,7 +44,7 @@ install_root: {{ROOT_DIR}}
 bin_dir: {{ROOT_DIR}}/bin
 ---
 
-{{UPDATE_CHECK}}
+{{ENTRYPOINT}}
 
 {{GLOBAL_FLAGS}}
 

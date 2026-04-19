@@ -37,7 +37,7 @@ setup() {
     cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
     cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
-    cp "$FIXTURES_DIR/skills/_partials/update-check.md" src/skills/_partials/update-check.md
+    cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" src/skills/_partials/entrypoint.md
     cp "$FIXTURES_DIR/README.md" README.md
     cat > src/bin/hello <<'EOF'
 #!/usr/bin/env bash

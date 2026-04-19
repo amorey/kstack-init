@@ -19,9 +19,9 @@ jobs:
         run: |
           shellcheck --severity=warning --external-sources \
             install \
-            src/bin/check-update src/bin/dismiss-update src/bin/uninstall src/bin/upgrade \
+            src/bin/check-update src/bin/dismiss-update src/bin/entrypoint src/bin/uninstall src/bin/upgrade \
             src/lib/*.sh src/scripts/*.sh \
-            src/skills/cluster-status/scripts/snapshot \
+            src/skills/cluster-status/scripts/main \
             src/tests/test_helper.bash
 
   bats:

@@ -21,7 +21,7 @@ setup() {
 
   SKILLS_SRC="$FIXTURES_DIR/skills"
   GF="$SKILLS_SRC/_partials/global-flags.md"
-  UC="$SKILLS_SRC/_partials/update-check.md"
+  EP="$SKILLS_SRC/_partials/entrypoint.md"
   README="$FIXTURES_DIR/README.md"
   OUT="$TMPDIR_TEST/out/SKILL.md"
   HELP="$TMPDIR_TEST/out/references/help.md"
@@ -30,7 +30,7 @@ setup() {
 
 render() {
   local skill_dir="${4:-/install/path}"
-  render_skill "$1" "$2" "$3" "$skill_dir" "$OUT" "$SKILLS_SRC" "$GF" "$UC"
+  render_skill "$1" "$2" "$3" "$skill_dir" "$OUT" "$SKILLS_SRC" "$GF" "$EP"
 }
 
 render_h() {
@@ -57,12 +57,12 @@ render_h() {
 @test "render_skill inlines both partials" {
   render demo claude /root
   grep -F "does one thing" "$OUT"
-  grep -F "check-update at session start" "$OUT"
+  grep -F "entrypoint --skill-dir" "$OUT"
 }
 
-@test "render_skill expands ROOT_DIR inside update-check partial" {
+@test "render_skill expands ROOT_DIR inside entrypoint partial" {
   render demo claude /opt/kstack
-  grep -F "Run /opt/kstack/bin/check-update" "$OUT"
+  grep -F "Run /opt/kstack/bin/entrypoint" "$OUT"
 }
 
 @test "render_skill leaves no raw template markers" {

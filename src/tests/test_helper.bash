@@ -55,3 +55,33 @@ assert_file_exists() {
     return 1
   fi
 }
+
+# stub_git [--fail] — install a git stub in MOCK_BIN that intercepts
+# `git ls-remote --tags …` and falls through to real git for everything else.
+# Without --fail: emits tags from the space-separated $MOCK_TAGS env var.
+# With --fail: `ls-remote` exits 1 (used to simulate network failures).
+stub_git() {
+  use_mocks
+  local mode=ok
+  [ "${1:-}" = "--fail" ] && mode=fail
+  local real_git
+  real_git="$(command -v git)"
+  if [ "$mode" = fail ]; then
+    write_stub git "
+REAL_GIT=$real_git
+if [ \"\$1\" = 'ls-remote' ]; then exit 1; fi
+exec \"\$REAL_GIT\" \"\$@\"
+"
+  else
+    write_stub git "
+REAL_GIT=$real_git
+if [ \"\$1\" = 'ls-remote' ]; then
+  for t in \$MOCK_TAGS; do
+    printf 'abcdef\trefs/tags/%s\n' \"\$t\"
+  done
+  exit 0
+fi
+exec \"\$REAL_GIT\" \"\$@\"
+"
+  fi
+}

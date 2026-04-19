@@ -29,7 +29,7 @@ setup() {
   cp "$SRC_ROOT/lib/cache.sh" "$FAKE_ROOT/src/lib/cache.sh"
   cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/src/skills/demo/SKILL.md.tmpl"
   cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/src/skills/_partials/global-flags.md"
-  cp "$FIXTURES_DIR/skills/_partials/update-check.md" "$FAKE_ROOT/src/skills/_partials/update-check.md"
+  cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" "$FAKE_ROOT/src/skills/_partials/entrypoint.md"
   cp "$FIXTURES_DIR/README.md" "$FAKE_ROOT/README.md"
   cat > "$FAKE_ROOT/src/bin/hello" <<'EOF'
 #!/usr/bin/env bash
@@ -57,6 +57,23 @@ EOF
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -x "$FAKE_ROOT/.kstack/bin/hello" ]
+}
+
+@test "install materializes entrypoint into .kstack/bin with exec bit" {
+  cp "$SRC_ROOT/bin/entrypoint" "$FAKE_ROOT/src/bin/entrypoint"
+  chmod +x "$FAKE_ROOT/src/bin/entrypoint"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$FAKE_ROOT/.kstack/bin/entrypoint" ]
+}
+
+@test "rendered SKILL.md contains the entrypoint invocation" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run grep -F "$FAKE_ROOT/.kstack/bin/entrypoint" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  [ "$status" -eq 0 ]
+  run grep -F -- "--skill-name=demo" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  [ "$status" -eq 0 ]
 }
 
 @test "install materializes lib/ under .kstack" {

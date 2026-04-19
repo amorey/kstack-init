@@ -7,7 +7,7 @@ bin_dir: {{ROOT_DIR}}/bin
 skill_dir: {{SKILL_DIR}}
 ---
 
-{{UPDATE_CHECK}}
+{{ENTRYPOINT}}
 
 {{GLOBAL_FLAGS}}
 
@@ -26,8 +26,4 @@ This skill takes no positional arguments. If the user supplies one, respond with
 
 ## Workflow
 
-Run `KSTACK_ROOT="{{ROOT_DIR}}" {{SKILL_DIR}}/scripts/snapshot` exactly once, forwarding every user-supplied flag verbatim. The script owns the full aggregation (kubectl fanout, severity scoring, rendering) and returns finished output on stdout.
-
-Display stdout verbatim — no edits, no restructuring, no added commentary. If the user passed `--json`, wrap the body in a ```json fenced block; otherwise print as-is. Do not run additional kubectl calls — the script owns the full snapshot. Route follow-up questions to `/investigate <kind>/<namespace>/<name>`.
-
-If the script exits non-zero, display its stderr verbatim and stop.
+The entrypoint dispatches to `{{SKILL_DIR}}/scripts/main`, which owns the full snapshot (kubectl fanout, severity scoring, rendering) and returns finished output on stdout with the appropriate terminal exit code. Do not run additional kubectl calls. Route follow-up questions to `/investigate <kind>/<namespace>/<name>`.

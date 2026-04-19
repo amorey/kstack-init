@@ -105,12 +105,12 @@ ensure_src_checkout() {
   write_install_conf "$KSTACK_CONFIG_DIR" "$tag"
 }
 
-# render_skill $skill $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $update_check_partial
+# render_skill $skill $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $entrypoint_partial
 render_skill() {
   local skill="$1" agent="$2" root_dir="$3" skill_dir="$4" out_file="$5"
-  local skills_src="$6" gf="$7" uc="$8"
+  local skills_src="$6" gf="$7" ep="$8"
   mkdir -p "$(dirname "$out_file")"
-  awk -v gf="$gf" -v uc="$uc" \
+  awk -v gf="$gf" -v ep="$ep" \
       -v root_dir="$root_dir" \
       -v skill_dir="$skill_dir" \
       -v skill="$skill" -v agent="$agent" '
@@ -126,7 +126,7 @@ render_skill() {
       close(path)
     }
     /\{\{GLOBAL_FLAGS\}\}/ { inline(gf); next }
-    /\{\{UPDATE_CHECK\}\}/ { inline(uc); next }
+    /\{\{ENTRYPOINT\}\}/   { inline(ep); next }
     { print subst($0) }
   ' "$skills_src/$skill/SKILL.md.tmpl" > "$out_file"
 }
@@ -214,7 +214,7 @@ install_agent() {
     [ -L "$help_file" ] && rm -f "$help_file"
     mkdir -p "$out_dir"
     render_skill "$skill" "$agent" "$root_dir" "$out_dir" "$out_file" \
-      "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"
+      "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$ENTRYPOINT_PARTIAL"
     render_help "$skill" "$REPO_ROOT/README.md" "$help_file"
     copy_skill_scripts "$SKILLS_SRC/$skill/scripts" "$out_dir/scripts"
     slots="$slots $slot"
@@ -364,8 +364,8 @@ main() {
   fi
 
   GLOBAL_FLAGS_PARTIAL="$SKILLS_SRC/_partials/global-flags.md"
-  UPDATE_CHECK_PARTIAL="$SKILLS_SRC/_partials/update-check.md"
-  for p in "$GLOBAL_FLAGS_PARTIAL" "$UPDATE_CHECK_PARTIAL"; do
+  ENTRYPOINT_PARTIAL="$SKILLS_SRC/_partials/entrypoint.md"
+  for p in "$GLOBAL_FLAGS_PARTIAL" "$ENTRYPOINT_PARTIAL"; do
     if [ ! -f "$p" ]; then
       echo "ERROR: missing partial: $p" >&2
       exit 1

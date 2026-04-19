@@ -25,7 +25,7 @@ Once you install kstack you'll have access to these K8s commands inside Claude C
 **Troubleshooting**
 * `/investigate <resource>` — Root-cause analysis across events, logs, and related resources
 * `/exec <pod>` — Guided shell with diagnostics preloaded; ephemeral debug container for scratch/distroless
-* `/logs` — Fetch container logs with remote grep via kubetail
+* `/logs` — Fetch container logs with remote grep via [Kubetail](https://github.com/kubetail-org/kubetail)
 
 **Audits**
 * `/audit-security` — RBAC, pod security posture, privilege tightening
@@ -90,7 +90,7 @@ Repo-local installs mirror this structure under the repo (e.g. `<repo>/.codex/sk
 
 ## Skills Reference
 
-Each skill is invoked with `/<name>` inside a Claude Code session. All skills are read-only by default — any action that mutates cluster state requires explicit confirmation. Skills honor your local `kubeconfig` context and respect RBAC.
+Each skill is invoked with `/<name>` inside an agent session. All skills are read-only by default — any action that mutates cluster state requires explicit confirmation. Skills honor your local `kubeconfig` context and respect RBAC.
 
 **Global flags** (supported by every skill):
 
@@ -118,7 +118,7 @@ Health snapshot across the entire cluster.
 
 **What it checks:** pod phase distribution, restart counts, node `Ready`/`MemoryPressure`/`DiskPressure`/`PIDPressure` conditions, unschedulable pods, workload replica drift (desired vs. ready), and PDB violations.
 
-**How it works:** a single fan-out of `kubectl get` calls with server-side field selectors, aggregated client-side. Summarization is delta-aware — on repeat runs, Claude highlights what changed rather than reprinting the full snapshot.
+**How it works:** a single fan-out of `kubectl get` calls with server-side field selectors, aggregated client-side. Summarization is delta-aware — on repeat runs, agent highlights what changed rather than reprinting the full snapshot.
 
 **Options:**
 - `--since <duration>` — only flag issues that appeared in the last N minutes (e.g. `--since 15m`)
@@ -151,11 +151,11 @@ Recent cluster events, ranked by severity and deduplicated.
 </dt>
 <dd>
 
-Long-running background watcher that pings Claude only when state changes.
+Long-running background watcher that pings agent only when state changes.
 
-**What it does:** starts a detached watcher (shell loop + filter script) that streams `kubectl get --watch` for the target resource. The filter compares each update to the previous state hash and only notifies Claude on meaningful changes: phase transitions, restart count increments, replica drift, new `Warning` events, node condition flips.
+**What it does:** starts a detached watcher (shell loop + filter script) that streams `kubectl get --watch` for the target resource. The filter compares each update to the previous state hash and only notifies agent on meaningful changes: phase transitions, restart count increments, replica drift, new `Warning` events, node condition flips.
 
-**Why it's cheap:** while the resource stays healthy, the model isn't in the loop — idle token cost is effectively zero. Claude only enters the conversation when the filter fires.
+**Why it's cheap:** while the resource stays healthy, the model isn't in the loop — idle token cost is effectively zero. Agent only enters the conversation when the filter fires.
 
 **Arguments:**
 - `<resource>` — any of `pod/<name>`, `deployment/<name>`, `node/<name>`, `namespace/<ns>`, or `cluster` for cluster-wide
@@ -205,7 +205,7 @@ Root-cause analysis for a failing or suspicious resource.
 
 Guided shell into a pod's container with diagnostics pre-loaded.
 
-**What it does:** opens an interactive `kubectl exec` session. Before handing you the prompt, Claude runs a lightweight probe (`ls /bin/sh`, env dump, DNS resolution of in-cluster services) and reports what's available. A history of common diagnostics (`nslookup`, `curl` to service endpoints, `env | grep`, `cat /proc/1/status`) is primed so you can recall with arrow-up.
+**What it does:** opens an interactive `kubectl exec` session. Before handing you the prompt, agent runs a lightweight probe (`ls /bin/sh`, env dump, DNS resolution of in-cluster services) and reports what's available. A history of common diagnostics (`nslookup`, `curl` to service endpoints, `env | grep`, `cat /proc/1/status`) is primed so you can recall with arrow-up.
 
 **Scratch/distroless fallback:** if the target container has no shell, kstack transparently switches to `kubectl debug --target=<container> --image=<toolbox>` (default toolbox: `nicolaka/netshoot` for network issues, `busybox` otherwise). The debug container shares the target's PID namespace, so `/proc/1/root` gives you the scratch container's filesystem.
 
@@ -225,9 +225,9 @@ Guided shell into a pod's container with diagnostics pre-loaded.
 </dt>
 <dd>
 
-Fetch and filter container logs with kubetail's remote grep feature.
+Fetch and filter container logs with Kubetail's remote grep feature.
 
-**Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to Claude. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs a Rust-powered regex filter on the node where the log lives and only sends matching lines back. This can reduce transferred data dramatically.
+**Why it matters:** `kubectl logs` streams the entire log to the client before you can filter it — on chatty services this is both slow and an expensive number of tokens to hand to agent. Kstack routes through [`kubetail`](https://github.com/kubetail-org/kubetail), which runs a Rust-powered regex filter on the node where the log lives and only sends matching lines back. This can reduce transferred data dramatically.
 
 **Arguments (all optional, composable):**
 - `--selector <label>` — label selector across pods (e.g. `app=api`)
@@ -356,19 +356,19 @@ Remove all kstack-managed resources from the cluster.
 **Labels kstack writes** on every resource it creates (these power the filter flags below):
 - `kstack.kubetail.com/owned-by=kstack` — the cleanup selector; presence of this label is what makes a resource a candidate
 - `kstack.kubetail.com/skill=<exec|watch|...>` — which kstack skill created the resource (powers `--skill`)
-- `kstack.kubetail.com/session=<id>` — the Claude Code session that created it (powers `--session` / `--this-session`)
+- `kstack.kubetail.com/session=<id>` — the agent session that created it (powers `--session` / `--this-session`)
 
 **Annotations kstack writes** (non-selectable metadata read client-side after the label selector narrows the candidate set):
 - `kstack.kubetail.com/created-at=<rfc3339>` — creation timestamp written by kstack itself, since `metadata.creationTimestamp` can be rewritten by admission controllers (powers `--older-than`)
 
-**How it works:** a single label-selector `kubectl get` across all namespaces builds the candidate list. Claude prints the full list (kind/namespace/name + age + session) and waits for confirmation before issuing deletes. Deletes run with `--wait=false` so a single stuck finalizer can't block the rest of the cleanup; anything that fails to terminate is reported back so you can intervene.
+**How it works:** a single label-selector `kubectl get` across all namespaces builds the candidate list. Agent prints the full list (kind/namespace/name + age + session) and waits for confirmation before issuing deletes. Deletes run with `--wait=false` so a single stuck finalizer can't block the rest of the cleanup; anything that fails to terminate is reported back so you can intervene.
 
 **Scope:** operates on the current kubeconfig context only. To clean up multiple clusters, run it once per context (use the global `--context <ctx>` flag, or switch contexts between runs). To clean up all clusters, use the `--all-clusters` flag.
 
 **Options:**
 - `--all-clusters` - cleanup resources on all clusters listed in kubeconfig
 - `--namespace <n>` — restrict cleanup to one namespace (default: cluster-wide)
-- `--this-session` — restrict to resources created by the current Claude Code session, useful for tearing down scratch state at the end of a debugging run without touching anything from earlier sessions
+- `--this-session` — restrict to resources created by the current agent session, useful for tearing down scratch state at the end of a debugging run without touching anything from earlier sessions
 - `--session <id>` — restrict to a specific session id (run `/cleanup-cluster --list-sessions` to see all sessions with surviving resources in the cluster)
 - `--older-than <duration>` — only delete resources older than N (e.g. `--older-than 24h`), useful for periodic cron-style cleanup
 - `--skill <name>` — restrict to resources created by a specific kstack skill (e.g. `--skill exec`)
@@ -403,7 +403,7 @@ Clear kstack's local cache and discard what it learned about your cluster(s).
 
 ## Upgrade
 
-When you run a kstack skill, Claude quietly checks whether a newer kstack release is available and surfaces a one-line notice at the top of its response when it finds one. Just say **"upgrade kstack"** and the agent will run the kstack upgrade script on your behalf; say **"dismiss"** to hide the notice until the next release. This works the same for both global and repo-local installs.
+When you run a kstack skill, agent quietly checks whether a newer kstack release is available and surfaces a one-line notice at the top of its response when it finds one. Just say **"upgrade kstack"** and the agent will run the kstack upgrade script on your behalf; say **"dismiss"** to hide the notice until the next release. This works the same for both global and repo-local installs.
 
 You can also run the helpers directly:
 

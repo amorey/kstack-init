@@ -23,6 +23,7 @@ setup() {
   mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/cache" "$HOME/.config/kstack/lib"
   cp "$SRC_ROOT/bin/check-update" "$HOME/.config/kstack/bin/check-update"
   cp "$SRC_ROOT/lib/cache.sh" "$HOME/.config/kstack/lib/cache.sh"
+  cp "$SRC_ROOT/lib/update-check.sh" "$HOME/.config/kstack/lib/update-check.sh"
   chmod +x "$HOME/.config/kstack/bin/check-update"
   CACHE_FILE="$HOME/.config/kstack/cache/update.json"
   CHECK="$HOME/.config/kstack/bin/check-update"
@@ -31,24 +32,7 @@ setup() {
   echo "v1.0.0" > "$HOME/.config/kstack/install.conf"
 }
 
-# ─── git stub ─────────────────────────────────────────────────
-# Intercepts `git ls-remote --tags ... v*` to emit MOCK_TAGS; everything else
-# falls through to real git. Used to control the "remote latest" for refresh.
-stub_git() {
-  use_mocks
-  REAL_GIT="$(command -v git)"
-  write_stub git "
-REAL_GIT=$REAL_GIT
-if [ \"\$1\" = 'ls-remote' ]; then
-  # Emit tags from \$MOCK_TAGS (space-separated).
-  for t in \$MOCK_TAGS; do
-    printf 'abcdef\trefs/tags/%s\n' \"\$t\"
-  done
-  exit 0
-fi
-exec \"\$REAL_GIT\" \"\$@\"
-"
-}
+# stub_git is provided by test_helper.bash.
 
 @test "check-update with stale cache refreshes from remote and prints notice" {
   stub_git
