@@ -58,9 +58,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPT_DIR/src/lib/agents.sh"
 
 KSTACK_CONFIG_DIR="$HOME/.config/kstack"
-# Global-mode clone target. Named "upstream" (not "src") because the cloned
-# repo carries its own src/ subdir; SRC_ROOT in global mode is $KSTACK_UPSTREAM/src.
-# ensure_src_checkout migrates legacy $KSTACK_CONFIG_DIR/src layouts on first run.
+# Global-mode clone target. SRC_ROOT in global mode is $KSTACK_UPSTREAM/src.
 KSTACK_UPSTREAM="$KSTACK_CONFIG_DIR/upstream"
 # Override KSTACK_REMOTE_URL for CI and local-clone testing. Leave unset for
 # normal user installs.
@@ -77,14 +75,6 @@ write_install_conf() { printf '%s\n' "$2" > "$1/install.conf"; }
 # exist anywhere, use `main` with a visible warning.
 ensure_src_checkout() {
   mkdir -p "$KSTACK_CONFIG_DIR"
-  # Migrate the legacy clone target ($KSTACK_CONFIG_DIR/src) to the new
-  # $KSTACK_UPSTREAM location. The old target collided with the repo's own
-  # src/ subdir after the source restructure; existing global installs
-  # self-heal on their next upgrade.
-  if [ -d "$KSTACK_CONFIG_DIR/src/.git" ] && [ ! -d "$KSTACK_UPSTREAM/.git" ]; then
-    log "Migrating legacy checkout $KSTACK_CONFIG_DIR/src → $KSTACK_UPSTREAM"
-    rm -rf "$KSTACK_CONFIG_DIR/src"
-  fi
   local tag
   if [ -d "$KSTACK_UPSTREAM/.git" ]; then
     log "Updating $KSTACK_UPSTREAM"

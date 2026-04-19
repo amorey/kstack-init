@@ -53,8 +53,6 @@ Both modes materialize a symmetric `{{ROOT_DIR}}/{bin,lib,cache}/` layout — th
 - **Repo-local** (`./install`): copies `src/bin/` → `<repo>/.kstack/bin/` and `src/lib/` → `<repo>/.kstack/lib/` (recursive — per-skill helper trees at `src/lib/<skill>/` are supported), writes `<repo>/.kstack/install.conf` from `git describe --tags --exact-match HEAD` (or current branch name), and renders skills into `<repo>/.<agent>/skills/<name>/SKILL.md`. `{{ROOT_DIR}}` = `<repo>/.kstack`. Upgrade via `git pull && ./install` or `<repo>/.kstack/bin/upgrade`.
 - **Global** (`./install --global`): maintains `~/.config/kstack/upstream/` at the latest `v*` tag, copies `upstream/src/bin/` → `~/.config/kstack/bin/` and `upstream/src/lib/` → `~/.config/kstack/lib/` (recursive), renders into `~/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `~/.config/kstack`. Upgrade via `~/.config/kstack/bin/upgrade`.
 
-The legacy global clone target was `~/.config/kstack/src/`. It collided with the repo's own `src/` subdir after the source restructure, so the root `install` script and the curl bootstrap both migrate the legacy path on first run (remove the old dir, re-clone into `upstream/`).
-
 The `bin/` helpers (`check-update`, `upgrade`, `uninstall`, `dismiss-update`) assume they sit at `{{ROOT_DIR}}/bin/<name>` and derive `ROOT_DIR` as `dirname "$SCRIPT_DIR"`. Running a helper directly from the source tree (`./src/bin/check-update`) without installing first is unsupported — paths resolve to the repo root rather than `.kstack/`. Keep that invariant when adding helpers.
 
 ### Bootstrap duplication

@@ -31,19 +31,11 @@ set -eu
 
 REPO="kubetail-org/kstack"
 UPSTREAM_DIR="$HOME/.config/kstack/upstream"
-LEGACY_DIR="$HOME/.config/kstack/src"
 
 main() {
   TAG=$(curl -sS "https://api.github.com/repos/$REPO/releases/latest" \
           | grep -o '"tag_name":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
   [ -n "$TAG" ] || { echo "Could not resolve latest kstack release." >&2; exit 1; }
-
-  # One-time migration: legacy layout used ~/.config/kstack/src/ as the
-  # clone target; the repo now carries its own src/ subdir, so the clone
-  # moved to upstream/ to avoid the src/src/ collision.
-  if [ -d "$LEGACY_DIR/.git" ] && [ ! -d "$UPSTREAM_DIR/.git" ]; then
-    rm -rf "$LEGACY_DIR"
-  fi
 
   if [ -d "$UPSTREAM_DIR/.git" ]; then
     git -C "$UPSTREAM_DIR" fetch --tags --quiet
