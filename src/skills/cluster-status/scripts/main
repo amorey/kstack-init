@@ -14,9 +14,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# cluster-status/scripts/main — placeholder.
-# The real implementation lands in a follow-up PR. Exits 10 so the entrypoint
-# treats the output as a terminal response (Claude prints stdout and stops).
 set -u
-echo "cluster-status is not yet implemented."
-exit 10
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+# shellcheck source=lib/cluster-info.sh
+. "$SCRIPT_DIR/lib/cluster-info.sh"
+
+err() { printf '%s\n' "$*" >&2; }
+
+main() {
+  local context=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --context=*) context="${1#--context=}"; shift ;;
+      --context)
+        if [ $# -lt 2 ]; then
+          err "Flag --context requires a value."
+          exit 11
+        fi
+        context="$2"; shift 2 ;;
+      *)
+        err "Unknown flag \`$1\`. Run \`/$KSTACK_SKILL_NAME --help\` for usage."
+        exit 11 ;;
+    esac
+  done
+
+  if [ -z "$context" ]; then
+    if ! context="$(kubectl config current-context 2>/dev/null)" || [ -z "$context" ]; then
+      err "Unable to determine current context. Set one with kubectl or pass --context."
+      exit 11
+    fi
+  fi
+
+  cluster_info::fetch "$context" || exit 11
+}
+
+main "$@"

@@ -259,6 +259,32 @@ EOF
   [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
 }
 
+@test "install mirrors skills/<name>/scripts/ subdirs (e.g. scripts/lib)" {
+  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts/lib"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
+  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
+  echo "helper() { echo hi; }" > "$FAKE_ROOT/src/skills/demo/scripts/lib/helper.sh"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
+  [ -f "$FAKE_ROOT/.claude/skills/demo/scripts/lib/helper.sh" ]
+}
+
+@test "install rebuilds scripts/ slot when source files are removed" {
+  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts/lib"
+  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
+  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
+  echo "x=1" > "$FAKE_ROOT/src/skills/demo/scripts/lib/helper.sh"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -d "$FAKE_ROOT/.claude/skills/demo/scripts/lib" ]
+  rm -rf "$FAKE_ROOT/src/skills/demo/scripts/lib"
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts/lib" ]
+  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
+}
+
 @test "install omits scripts/ slot when source skill has no scripts dir" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]

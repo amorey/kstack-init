@@ -255,15 +255,28 @@ sync_dir() {
 copy_bin() { sync_dir "$1" '*' "$2" "bin/" 1; }
 
 # copy_skill_scripts $src $dst
-#   Mirror a skill's scripts/ dir into the rendered slot as executable files.
-#   Removes $dst if $src is absent so the slot matches the source.
+#   Mirror a skill's scripts/ dir into the rendered slot. Top-level files are
+#   chmod +x (entrypoint-dispatched scripts); subdirs like scripts/lib/ are
+#   copied recursively so skills can modularize helpers they source at runtime.
+#   The slot is owned entirely by the installer, so we wipe $dst and rebuild
+#   it from source — orphan pruning happens at the skill-slot level above.
 copy_skill_scripts() {
   local src="$1" dst="$2"
-  if [ -d "$src" ]; then
-    sync_dir "$src" '*' "$dst" "scripts/" 1
-  else
-    rm -rf "$dst"
-  fi
+  rm -rf "$dst"
+  [ -d "$src" ] || return 0
+  mkdir -p "$dst"
+  local f name
+  for f in "$src"/*; do
+    [ -e "$f" ] || continue
+    name="${f##*/}"
+    [ "$name" = ".gitkeep" ] && continue
+    if [ -d "$f" ]; then
+      cp -R "$f" "$dst/$name"
+    else
+      cp "$f" "$dst/$name"
+      chmod +x "$dst/$name"
+    fi
+  done
 }
 
 # copy_lib $src $dst — sync lib/*.sh and each lib/<subdir>/ (per-skill helpers).
@@ -332,6 +345,7 @@ main() {
   # REPO_ROOT is the top of the source checkout (holds README.md and the
   # src/ subdir). SRC_ROOT is the src/ subdir itself (holds skills/, lib/, bin/).
   if [ "$GLOBAL" -eq 1 ]; then
+    # shellcheck disable=SC2086 # intentional word-splitting to format each agent
     log "🚀 Installing kstack (global) ·$(printf ' %s' $TARGET_AGENTS)"
     log ""
     ensure_src_checkout
@@ -339,6 +353,7 @@ main() {
     SRC_ROOT="$KSTACK_UPSTREAM/src"
     ROOT_DIR="$KSTACK_CONFIG_DIR"
   else
+    # shellcheck disable=SC2086 # intentional word-splitting to format each agent
     log "🚀 Installing kstack (local) ·$(printf ' %s' $TARGET_AGENTS)"
     log ""
     REPO_ROOT="$SCRIPT_DIR"

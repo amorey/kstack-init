@@ -52,3 +52,7 @@ Priority: highest-value + simplest first.
 - Translations: done pre-launch (README already links them as if they exist)
 - Kubetail remote grep: the Rust filter exists; work is enabling it in the Kubetail CLI
 - Testing: kind fixtures + eval rubric, deferred until `/cluster-status` is scaffolded
+
+## MISC
+
+[ ] Handle default context (should we use kubeconfig, allow for change during session?)
