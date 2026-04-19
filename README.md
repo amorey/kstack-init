@@ -121,8 +121,8 @@ Health snapshot across the entire cluster.
 **How it works:** a single fan-out of `kubectl get` calls with server-side field selectors, aggregated client-side. Summarization is delta-aware — on repeat runs, agent highlights what changed rather than reprinting the full snapshot.
 
 **Options:**
-- `--since <duration>` — only flag issues that appeared in the last N minutes (e.g. `--since 15m`)
-- `--severity <level>` — filter output to `critical`, `warning`, or `info`
+- `--refresh` — fetch most recent data, bypassing and refreshing the cache (default: `false`)
+- `--ttl <duration>` — only update the cache if older than this (kubectl-style: `5m`, `1h`, `24h`; default: `5m`). Ignored when `--refresh` is set
 
 </dd>
 <dt>

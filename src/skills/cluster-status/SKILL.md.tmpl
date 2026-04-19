@@ -17,8 +17,8 @@ This skill takes no positional arguments. If the user supplies one, respond with
 
 ## Skill flags
 
-- `--since <duration>` — Only flag issues observed in the last N (e.g. `5m`, `1h`, `24h`). Default: no time filter.
-- `--severity <critical|warning|info>` — Filter output to findings at or above the given severity. Default: include all.
+- `--refresh` — Fetch most recent data, bypassing and refreshing the cache. Default: `false`.
+- `--ttl <duration>` — Only update the cache if older than this (kubectl-style: `5m`, `1h`, `24h`). Default: `5m`. Ignored when `--refresh` is set.
 
 ## Workflow
 

@@ -29,6 +29,8 @@ err() { printf '%s\n' "$*" >&2; }
 
 main() {
   local context=""
+  local refresh="false"
+  local ttl="5m"
   while [ $# -gt 0 ]; do
     case "$1" in
       --context=*) context="${1#--context=}"; shift ;;
@@ -38,6 +40,14 @@ main() {
           exit 11
         fi
         context="$2"; shift 2 ;;
+      --refresh) refresh="true"; shift ;;
+      --ttl=*) ttl="${1#--ttl=}"; shift ;;
+      --ttl)
+        if [ $# -lt 2 ]; then
+          err "Flag --ttl requires a value."
+          exit 11
+        fi
+        ttl="$2"; shift 2 ;;
       *)
         err "Unknown flag \`$1\`. Run \`/$KSTACK_SKILL_NAME --help\` for usage."
         exit 11 ;;
@@ -51,11 +61,11 @@ main() {
     fi
   fi
 
-  cluster_info::fetch "$context" || exit 11
+  cluster_info::fetch "$context" "$refresh" "$ttl" || exit 11
   printf '\n'
-  node_info::fetch "$context" || exit 11
+  node_info::fetch "$context" "$refresh" "$ttl" || exit 11
   printf '\n'
-  pod_info::fetch "$context" || exit 11
+  pod_info::fetch "$context" "$refresh" "$ttl" || exit 11
 }
 
 main "$@"
