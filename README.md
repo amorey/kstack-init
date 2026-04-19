@@ -122,7 +122,7 @@ Health snapshot across the entire cluster.
 
 **Options:**
 - `--refresh` — fetch most recent data, bypassing and refreshing the cache (default: `false`)
-- `--ttl <duration>` — only update the cache if older than this (kubectl-style: `5m`, `1h`, `24h`; default: `5m`). Ignored when `--refresh` is set
+- `--ttl <duration>` — only update the cache if older than `<duration>` (default: `5m`)
 
 </dd>
 <dt>
