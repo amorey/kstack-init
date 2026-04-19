@@ -25,12 +25,14 @@ cluster_info::fetch() {
 
   local server
   if ! server="$(kubectl --context="$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null)" || [ -z "$server" ]; then
+    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
     printf 'Unable to resolve API server address for context `%s`.\n' "$context" >&2
     return 1
   fi
 
   local version_json
   if ! version_json="$(kubectl --context="$context" version -o json 2>/dev/null)"; then
+    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
     printf 'Unable to fetch cluster version for context `%s`.\n' "$context" >&2
     return 1
   fi
@@ -40,6 +42,7 @@ cluster_info::fetch() {
   platform="$(printf '%s' "$version_json" | jq -r '.serverVersion.platform // empty')"
 
   if [ -z "$k8s_version" ]; then
+    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
     printf 'Server version missing from `kubectl version` output.\n' >&2
     return 1
   fi

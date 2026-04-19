@@ -16,13 +16,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run shellcheck
-        run: |
-          shellcheck --severity=warning --external-sources \
-            install \
-            src/bin/check-update src/bin/dismiss-update src/bin/entrypoint src/bin/uninstall src/bin/upgrade \
-            src/lib/*.sh scripts/*.sh \
-            src/skills/cluster-status/scripts/main \
-            src/tests/test_helper.bash
+        run: ./scripts/lint.sh
 
   bats:
     strategy:
