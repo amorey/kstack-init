@@ -190,11 +190,10 @@ prune_orphans() {
   done
 }
 
-# install_agent $mode $agent $root_dir $skills_dir $slot_prefix
-#   $mode is "local" or "global" — used for log text only.
+# install_agent $agent $root_dir $skills_dir $slot_prefix
 #   $slot_prefix is "" for local, "kstack-" for global.
 install_agent() {
-  local mode="$1" agent="$2" root_dir="$3" skills_dir="$4" slot_prefix="$5"
+  local agent="$1" root_dir="$2" skills_dir="$3" slot_prefix="$4"
   mkdir -p "$skills_dir"
 
   local slots="" skill slot out_dir out_file help_file
@@ -383,13 +382,13 @@ main() {
   if [ "$GLOBAL" -eq 1 ]; then
     # install.conf is written by ensure_src_checkout.
     for h in $TARGET_AGENTS; do
-      install_agent global "$h" "$ROOT_DIR" \
+      install_agent "$h" "$ROOT_DIR" \
         "$(agent_skills_dir_global "$h")" "kstack-"
     done
   else
     write_local_install_conf "$ROOT_DIR" "$REPO_ROOT"
     for h in $TARGET_AGENTS; do
-      install_agent local "$h" "$ROOT_DIR" \
+      install_agent "$h" "$ROOT_DIR" \
         "$(agent_skills_dir_local "$REPO_ROOT" "$h")" ""
     done
   fi
