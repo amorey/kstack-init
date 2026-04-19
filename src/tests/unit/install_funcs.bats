@@ -30,7 +30,7 @@ setup() {
 
 render() {
   local skill_dir="${4:-/install/path}"
-  render_skill "$1" "$2" "$3" "$skill_dir" "$OUT" "$SKILLS_SRC" "$GF" "$EP"
+  render_skill "$1" "kstack-$1" "$2" "$3" "$skill_dir" "$OUT" "$SKILLS_SRC" "$GF" "$EP"
 }
 
 render_h() {

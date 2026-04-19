@@ -102,20 +102,23 @@ ensure_src_checkout() {
   write_install_conf "$KSTACK_CONFIG_DIR" "$tag"
 }
 
-# render_skill $skill $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $entrypoint_partial
+# render_skill $skill $skill_name $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $entrypoint_partial
+#   $skill      — source directory under $skills_src (template lookup)
+#   $skill_name — value substituted for {{SKILL_NAME}} (the user-visible slot name,
+#                 prefixed with "kstack-" in global mode)
 render_skill() {
-  local skill="$1" agent="$2" root_dir="$3" skill_dir="$4" out_file="$5"
-  local skills_src="$6" gf="$7" ep="$8"
+  local skill="$1" skill_name="$2" agent="$3" root_dir="$4" skill_dir="$5" out_file="$6"
+  local skills_src="$7" gf="$8" ep="$9"
   mkdir -p "$(dirname "$out_file")"
   awk -v gf="$gf" -v ep="$ep" \
       -v root_dir="$root_dir" \
       -v skill_dir="$skill_dir" \
-      -v skill="$skill" -v agent="$agent" '
+      -v skill_name="$skill_name" -v agent="$agent" '
     function subst(s) {
-      gsub(/\{\{ROOT_DIR\}\}/,     root_dir,  s)
-      gsub(/\{\{SKILL_DIR\}\}/,    skill_dir, s)
-      gsub(/\{\{SKILL_NAME\}\}/,   skill,     s)
-      gsub(/\{\{AGENT\}\}/,        agent,     s)
+      gsub(/\{\{ROOT_DIR\}\}/,     root_dir,   s)
+      gsub(/\{\{SKILL_DIR\}\}/,    skill_dir,  s)
+      gsub(/\{\{SKILL_NAME\}\}/,   skill_name, s)
+      gsub(/\{\{AGENT\}\}/,        agent,      s)
       return s
     }
     function inline(path,    line) {
@@ -209,7 +212,7 @@ install_agent() {
     [ -L "$out_file" ] && rm -f "$out_file"
     [ -L "$help_file" ] && rm -f "$help_file"
     mkdir -p "$out_dir"
-    render_skill "$skill" "$agent" "$root_dir" "$out_dir" "$out_file" \
+    render_skill "$skill" "$slot" "$agent" "$root_dir" "$out_dir" "$out_file" \
       "$SKILLS_SRC" "$GLOBAL_FLAGS_PARTIAL" "$ENTRYPOINT_PARTIAL"
     render_help "$skill" "$REPO_ROOT/README.md" "$help_file"
     copy_skill_scripts "$SKILLS_SRC/$skill/scripts" "$out_dir/scripts"

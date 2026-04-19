@@ -39,9 +39,6 @@ Cross-cutting prose that every skill needs (e.g. the global-flags contract) live
 ---
 name: {{SKILL_NAME}}
 description: <one-line outcome + differentiator>
-agent: {{AGENT}}
-install_root: {{ROOT_DIR}}
-bin_dir: {{ROOT_DIR}}/bin
 ---
 
 {{ENTRYPOINT}}

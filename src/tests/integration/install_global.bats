@@ -89,6 +89,13 @@ EOF
   [ "$status" -eq 0 ]
 }
 
+@test "install --global substitutes SKILL_NAME to the prefixed slot name" {
+  run "$RUN_INSTALL" --global --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run grep -F "name: kstack-demo" "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
 @test "install --global copies skills/<name>/scripts/ into rendered slot" {
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
