@@ -11,7 +11,8 @@ kstack is a **skill pack** (not an app) distributed to Claude Code and other age
 ## Layout
 
 - `install` (repo root) — the installer. Its `SCRIPT_DIR` is the repo root, so it reads from `src/` and writes outputs (`.kstack/`, `.<agent>/skills/`) alongside itself.
-- `src/{bin,lib,skills,scripts,tests,_partials}/` — all other source lives here.
+- `src/{bin,lib,skills,tests,_partials}/` — all other source lives here.
+- `scripts/` — repo dev scripts (test runners, clean, hosted bootstrap).
 - `src/CLAUDE.md` — this file.
 - `assets/`, `README.md`, `.github/` — user-facing metadata, stay at repo root.
 
@@ -19,15 +20,15 @@ All commands and paths below are relative to the repo root.
 
 ## Commands
 
-- `./src/scripts/test.sh` — run the fast bats tiers (`src/tests/unit` + `src/tests/integration`). Requires `bats-core` (`brew install bats-core` / `apt install bats`). Pass `--all` to also run the e2e tier.
-- `./src/scripts/test-e2e.sh` — run the cluster-backed tier against a kind cluster named `kstack-test`. The kind lifecycle lives in `src/tests/e2e/lib/kind-cluster.sh` and is shared with the eval tier; the bats suite hook `src/tests/e2e/setup_suite.bash` is a thin wrapper around it. No prior `kind` state is required. Set `KSTACK_REUSE_CLUSTER=1` during dev loops to keep the cluster alive across runs. Requires `kind`, `kubectl`, and a running Docker daemon.
-- `./src/scripts/test-evals.sh` — run the eval tier: plants fixtures in the kind cluster, invokes skills via `claude -p`, and scores the responses. Requires `ANTHROPIC_API_KEY`, `claude`, `jq`, and `yq` in addition to the e2e prerequisites. Exits 0 with a skip message when `ANTHROPIC_API_KEY` is unset. Env: `KSTACK_EVAL_MAX_RUNS` (override samples per scenario), `KSTACK_EVAL_BUDGET_USD` (hard cost cap). Flags: `--scenario <id>` to run one, `--include-placeholder` to run the smoke scenario.
+- `./scripts/test.sh` — run the fast bats tiers (`src/tests/unit` + `src/tests/integration`). Requires `bats-core` (`brew install bats-core` / `apt install bats`). Pass `--all` to also run the e2e tier.
+- `./scripts/test-e2e.sh` — run the cluster-backed tier against a kind cluster named `kstack-test`. The kind lifecycle lives in `src/tests/e2e/lib/kind-cluster.sh` and is shared with the eval tier; the bats suite hook `src/tests/e2e/setup_suite.bash` is a thin wrapper around it. No prior `kind` state is required. Set `KSTACK_REUSE_CLUSTER=1` during dev loops to keep the cluster alive across runs. Requires `kind`, `kubectl`, and a running Docker daemon.
+- `./scripts/test-evals.sh` — run the eval tier: plants fixtures in the kind cluster, invokes skills via `claude -p`, and scores the responses. Requires `ANTHROPIC_API_KEY`, `claude`, `jq`, and `yq` in addition to the e2e prerequisites. Exits 0 with a skip message when `ANTHROPIC_API_KEY` is unset. Env: `KSTACK_EVAL_MAX_RUNS` (override samples per scenario), `KSTACK_EVAL_BUDGET_USD` (hard cost cap). Flags: `--scenario <id>` to run one, `--include-placeholder` to run the smoke scenario.
 - `bats src/tests/unit/<file>.bats` — run a single test file. Use `bats -f "<name pattern>" …` to run one test.
 - `./install` — render skills into `<repo>/.<agent>/skills/…` for every agent CLI detected on `PATH` (repo-local mode). Reads sources from `src/`, writes outputs next to itself at the repo root.
 - `./install --global` — clone/update `~/.config/kstack/upstream/` at the latest release tag and render into `~/.<agent>/skills/kstack-<skill>/…`. Do **not** use the invoker's checkout as the source in global mode; it always pulls canonical upstream.
-- `./src/scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
+- `./scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
 
-CI (`.github/workflows/ci.yml`) runs four jobs. `lint` shellchecks the root `install` script plus everything under `src/bin/` (including `entrypoint`), `src/lib/`, `src/scripts/`, `src/skills/cluster-status/scripts/main`, and `src/tests/test_helper.bash` (severity=warning, external-sources on). `bats` runs `src/scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. `bats-e2e` runs `src/scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check. `evals` runs `src/scripts/test-evals.sh` but is `workflow_dispatch`-only — trigger it manually via `gh workflow run ci.yml`.
+CI (`.github/workflows/ci.yml`) runs four jobs. `lint` shellchecks the root `install` script plus everything under `src/bin/` (including `entrypoint`), `src/lib/`, `scripts/`, `src/skills/cluster-status/scripts/main`, and `src/tests/test_helper.bash` (severity=warning, external-sources on). `bats` runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. `bats-e2e` runs `scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check. `evals` runs `scripts/test-evals.sh` but is `workflow_dispatch`-only — trigger it manually via `gh workflow run ci.yml`.
 
 ## Architecture
 
@@ -63,7 +64,7 @@ A skill opts into automatic shell dispatch by shipping an executable `scripts/ma
 
 ### Bootstrap duplication
 
-`src/scripts/install.sh` is the source for the `curl … | bash` bootstrap hosted at `https://www.kubestack.xyz/install.sh`. A verbatim copy lives in the `kubetail-website` repo's static assets and is **not automatically synced** — when you edit this file, copy it over manually.
+`scripts/install.sh` is the source for the `curl … | bash` bootstrap hosted at `https://www.kubestack.xyz/install.sh`. A verbatim copy lives in the `kubetail-website` repo's static assets and is **not automatically synced** — when you edit this file, copy it over manually.
 
 ### Install root layout
 
@@ -73,8 +74,8 @@ An install materializes `{{ROOT_DIR}}/{bin,lib,cache,state,install.conf}` — `~
 
 - `src/tests/unit/` — sourced-function tests (e.g. `agents.bats` sources `src/lib/agents.sh`).
 - `src/tests/integration/` — end-to-end CLI tests that build a fake kstack checkout under `$BATS_TEST_TMPDIR` and run `install` against it with an isolated `$HOME`. See `src/tests/test_helper.bash` (`common_setup`, `use_mocks`, `write_stub`). The fakes mirror the real repo layout: the `install` script at the fake root plus `src/lib/`, `src/bin/`, `src/skills/`, etc. underneath.
-- `src/tests/e2e/` — cluster-backed tests. `src/tests/e2e/lib/kind-cluster.sh` owns the kind lifecycle (shared with the eval tier); `src/tests/e2e/setup_suite.bash` is the bats `setup_suite`/`teardown_suite` wrapper. Tests inherit `KUBECONFIG` and talk to the cluster directly. Only fires under `src/scripts/test-e2e.sh` — never under `src/scripts/test.sh`.
-- `src/tests/evals/` — skill evaluation scenarios. Each `scenarios/<id>/` is a self-contained package: `scenario.yaml` (metadata + claude flags), `fixture.yaml` (kubectl manifests), `prompt.txt` (user turn), `expected.yaml` (keyword/structured/judge rubric), optional `wait.sh`. Runner libs live under `src/tests/evals/lib/` and are driven by `src/scripts/test-evals.sh`. Artifacts (transcripts, judge outputs, state snapshots) land under `src/tests/evals/artifacts/<id>/` and are gitignored. See `src/tests/evals/README.md` for the full authoring guide.
+- `src/tests/e2e/` — cluster-backed tests. `src/tests/e2e/lib/kind-cluster.sh` owns the kind lifecycle (shared with the eval tier); `src/tests/e2e/setup_suite.bash` is the bats `setup_suite`/`teardown_suite` wrapper. Tests inherit `KUBECONFIG` and talk to the cluster directly. Only fires under `scripts/test-e2e.sh` — never under `scripts/test.sh`.
+- `src/tests/evals/` — skill evaluation scenarios. Each `scenarios/<id>/` is a self-contained package: `scenario.yaml` (metadata + claude flags), `fixture.yaml` (kubectl manifests), `prompt.txt` (user turn), `expected.yaml` (keyword/structured/judge rubric), optional `wait.sh`. Runner libs live under `src/tests/evals/lib/` and are driven by `scripts/test-evals.sh`. Artifacts (transcripts, judge outputs, state snapshots) land under `src/tests/evals/artifacts/<id>/` and are gitignored. See `src/tests/evals/README.md` for the full authoring guide.
 - `src/tests/fixtures/` — minimal skill + partial fixtures used by integration tests (so tests aren't coupled to real skill contents).
 
 The bats helper `src/tests/test_helper.bash` exposes two root vars: `SRC_ROOT` resolves to `src/` (the source tree root — tests reference it as `$SRC_ROOT/lib/…`, `$SRC_ROOT/bin/…`, etc.), and `REPO_ROOT` resolves to the actual repo top, where the user-facing `install` script lives.

@@ -19,12 +19,12 @@ setup() {
   common_setup
 
   # Stage a fake repo with the script + some artifacts to clean.
-  # Mirror the real layout: script lives at <repo>/src/scripts/clean.sh.
+  # Mirror the real layout: script lives at <repo>/scripts/clean.sh.
   FAKE_REPO="$TMPDIR_TEST/fake-repo"
-  mkdir -p "$FAKE_REPO/src/scripts"
-  cp "$SRC_ROOT/scripts/clean.sh" "$FAKE_REPO/src/scripts/clean.sh"
-  chmod +x "$FAKE_REPO/src/scripts/clean.sh"
-  CLEAN="$FAKE_REPO/src/scripts/clean.sh"
+  mkdir -p "$FAKE_REPO/scripts"
+  cp "$REPO_ROOT/scripts/clean.sh" "$FAKE_REPO/scripts/clean.sh"
+  chmod +x "$FAKE_REPO/scripts/clean.sh"
+  CLEAN="$FAKE_REPO/scripts/clean.sh"
 }
 
 @test "clean.sh removes every listed path that exists" {

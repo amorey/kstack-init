@@ -179,6 +179,8 @@ EOF
 }
 
 @test "scripts/main not executable → exit 11" {
+  stub_git
+  export MOCK_TAGS="v1.0.0"
   : > "$SKILL_DIR/scripts/main"  # create but do not chmod +x
   run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
   [ "$status" -eq 11 ]

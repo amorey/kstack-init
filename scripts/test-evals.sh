@@ -38,7 +38,7 @@
 #   -h | --help               print this message
 set -eu
 
-SRC_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC_ROOT="$(cd "$(dirname "$0")/../src" && pwd)"
 EVAL_DIR="$SRC_ROOT/tests/evals"
 SCENARIO_ROOT="$EVAL_DIR/scenarios"
 ARTIFACTS_ROOT="$EVAL_DIR/artifacts"

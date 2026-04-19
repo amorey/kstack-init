@@ -20,8 +20,8 @@
 
 TEST_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # SRC_ROOT points at src/ — the source tree root that holds lib/, bin/,
-# skills/, scripts/ etc. REPO_ROOT is the actual repo top, one level up,
-# where the user-facing install script and README.md live.
+# skills/ etc. REPO_ROOT is the actual repo top, one level up, where the
+# user-facing install script, README.md, and scripts/ live.
 SRC_ROOT="$(cd "$TEST_HELPER_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SRC_ROOT/.." && pwd)"
 FIXTURES_DIR="$TEST_HELPER_DIR/fixtures"

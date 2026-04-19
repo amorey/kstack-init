@@ -437,7 +437,7 @@ Run the test suite with bats-core:
 brew install bats-core        # macOS
 # or: apt install bats        # Debian/Ubuntu
 
-./src/scripts/test.sh
+./scripts/test.sh
 ```
 
 Tests live in `src/tests/unit/` (sourced-function tests) and `src/tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every push and PR — see `.github/workflows/ci.yml`.

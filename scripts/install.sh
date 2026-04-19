@@ -39,11 +39,11 @@ main() {
   [ -n "$TAG" ] || { echo "Could not resolve latest kstack release." >&2; exit 1; }
 
   if [ -d "$UPSTREAM_DIR/.git" ]; then
-    echo "📥 Updating kstack @ $TAG…"
+    echo "📥 Updating kstack @ ${TAG}…"
     git -C "$UPSTREAM_DIR" fetch --tags --quiet
     git -C "$UPSTREAM_DIR" checkout --quiet "$TAG"
   else
-    echo "📥 Fetching kstack @ $TAG…"
+    echo "📥 Fetching kstack @ ${TAG}…"
     mkdir -p "$(dirname "$UPSTREAM_DIR")"
     git clone --depth 1 --branch "$TAG" --quiet "https://github.com/$REPO.git" "$UPSTREAM_DIR"
   fi

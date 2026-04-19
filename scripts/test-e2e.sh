@@ -14,35 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# scripts/test.sh — run the bats test suite.
+# scripts/test-e2e.sh — run the e2e (cluster-backed) bats tier.
 #
-# Default: runs the fast tiers (unit + integration) on every supported OS.
-# With --all: additionally runs the e2e tier (requires kind + docker).
+# Spins up a kind cluster via tests/e2e/setup_suite.bash, runs the tests,
+# and tears the cluster down. Set KSTACK_REUSE_CLUSTER=1 to keep the
+# cluster alive across runs for faster iteration.
 #
-# Requires bats-core (brew install bats-core, or apt install bats).
+# Requires: bats-core, kind, kubectl, docker.
 set -eu
 
-SRC_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-RUN_E2E=0
-for arg in "$@"; do
-  case "$arg" in
-    --all) RUN_E2E=1 ;;
-    -h|--help)
-      cat <<EOF
-Usage: scripts/test.sh [--all]
-
-  (no flag)  Run fast tiers: tests/unit + tests/integration
-  --all      Also run tests/e2e via scripts/test-e2e.sh (requires kind)
-EOF
-      exit 0
-      ;;
-    *)
-      echo "unknown flag: $arg" >&2
-      exit 2
-      ;;
-  esac
-done
+SRC_ROOT="$(cd "$(dirname "$0")/../src" && pwd)"
 
 if ! command -v bats >/dev/null 2>&1; then
   echo "bats not found. Install with:" >&2
@@ -51,8 +32,4 @@ if ! command -v bats >/dev/null 2>&1; then
   exit 1
 fi
 
-bats "$SRC_ROOT/tests/unit" "$SRC_ROOT/tests/integration"
-
-if [ "$RUN_E2E" = "1" ]; then
-  exec "$SRC_ROOT/scripts/test-e2e.sh"
-fi
+exec bats "$SRC_ROOT/tests/e2e"
