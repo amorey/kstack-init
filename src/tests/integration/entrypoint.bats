@@ -42,21 +42,21 @@ setup() {
 # ─── --help short-circuit ──────────────────────────────────────
 
 @test "--help prints help body and exits 0" {
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --help
+  run "$EP" --skill-dir="$SKILL_DIR" -- --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"help body"* ]]
   [[ "$output" == *"=== END HELP ==="* ]]
 }
 
 @test "--help wins even when other flags are present" {
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --context=foo --help
+  run "$EP" --skill-dir="$SKILL_DIR" -- --context=foo --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"help body"* ]]
 }
 
 @test "--help with missing help.md exits 11 with install-bug message" {
   rm "$SKILL_DIR/references/help.md"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --help
+  run "$EP" --skill-dir="$SKILL_DIR" -- --help
   [ "$status" -eq 11 ]
   [[ "$output" == *"Help page missing"* ]]
 }
@@ -64,7 +64,7 @@ setup() {
 @test "--help skips the update check (no notice glued to help output)" {
   stub_git
   export MOCK_TAGS="v9.9.9"  # would produce a notice if update-check ran
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --help
+  run "$EP" --skill-dir="$SKILL_DIR" -- --help
   [ "$status" -eq 0 ]
   [[ "$output" != *"is available"* ]]
 }
@@ -80,7 +80,7 @@ setup() {
   "latest_known": "v1.0.0"
 }
 EOF
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
   [[ "$output" == *"kstack v2.0.0 is available"* ]]
 }
@@ -95,7 +95,7 @@ EOF
   "latest_known": "v1.0.0"
 }
 EOF
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
@@ -103,7 +103,7 @@ EOF
 @test "git ls-remote failure leaves invocation silent (not broken)" {
   stub_git --fail
   rm -f "$CACHE_FILE"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
@@ -112,7 +112,7 @@ EOF
   rm "$ROOT/install.conf"
   stub_git
   export MOCK_TAGS="v9.0.0"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
@@ -121,7 +121,7 @@ EOF
   echo "main" > "$ROOT/install.conf"
   stub_git
   export MOCK_TAGS="v9.0.0"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
@@ -131,7 +131,7 @@ EOF
 @test "no scripts/main → exit 0 with empty stdout (Claude handles body)" {
   stub_git
   export MOCK_TAGS="v1.0.0"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
@@ -145,7 +145,7 @@ echo "snapshot output"
 exit 10
 EOF
   chmod +x "$SKILL_DIR/scripts/main"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 10 ]
   [[ "$output" == *"snapshot output"* ]]
 }
@@ -159,7 +159,7 @@ echo "user-facing error" >&2
 exit 11
 EOF
   chmod +x "$SKILL_DIR/scripts/main"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 11 ]
   [[ "$output" == *"user-facing error"* ]]
 }
@@ -173,7 +173,7 @@ echo "boom" >&2
 exit 1
 EOF
   chmod +x "$SKILL_DIR/scripts/main"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 1 ]
   [[ "$output" == *"boom"* ]]
 }
@@ -182,7 +182,7 @@ EOF
   stub_git
   export MOCK_TAGS="v1.0.0"
   : > "$SKILL_DIR/scripts/main"  # create but do not chmod +x
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --
+  run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 11 ]
   [[ "$output" == *"not executable"* ]]
 }
@@ -197,7 +197,7 @@ EOF
   chmod +x "$SKILL_DIR/scripts/main"
   stub_git
   export MOCK_TAGS="v1.0.0"
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --context=dev foo bar
+  run "$EP" --skill-dir="$SKILL_DIR" -- --context=dev foo bar
   [ "$status" -eq 10 ]
   [[ "$output" == *"root=$ROOT"* ]]
   [[ "$output" == *"dir=$SKILL_DIR"* ]]
@@ -208,22 +208,17 @@ EOF
 # ─── parser errors ─────────────────────────────────────────────
 
 @test "missing --skill-dir exits 11" {
-  run "$EP" --skill-name=demo --
-  [ "$status" -eq 11 ]
-}
-
-@test "missing --skill-name exits 11" {
-  run "$EP" --skill-dir="$SKILL_DIR" --
+  run "$EP" --
   [ "$status" -eq 11 ]
 }
 
 @test "missing '--' separator exits 11" {
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo
+  run "$EP" --skill-dir="$SKILL_DIR"
   [ "$status" -eq 11 ]
 }
 
 @test "unexpected flag before '--' exits 11" {
-  run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo --bogus -- --help
+  run "$EP" --skill-dir="$SKILL_DIR" --bogus -- --help
   [ "$status" -eq 11 ]
   [[ "$output" == *"Unexpected flag"* ]]
 }

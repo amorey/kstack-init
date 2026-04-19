@@ -72,7 +72,7 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F "$FAKE_ROOT/.kstack/bin/entrypoint" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
-  run grep -F -- "--skill-name=demo" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
+  run grep -F -- "--skill-dir=$FAKE_ROOT/.claude/skills/demo" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 

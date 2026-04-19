@@ -2,7 +2,7 @@
 
 Before doing anything else this turn, run:
 
-    {{ROOT_DIR}}/bin/entrypoint --skill-dir={{SKILL_DIR}} --skill-name={{SKILL_NAME}} -- <user args verbatim>
+    {{ROOT_DIR}}/bin/entrypoint --skill-dir={{SKILL_DIR}} -- <user args verbatim>
 
 Then inspect the exit code:
 

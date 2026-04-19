@@ -48,11 +48,10 @@ has_help_flag() {
 }
 
 main() {
-  local skill_dir="" skill_name="" saw_sep=0
+  local skill_dir="" saw_sep=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --skill-dir=*)  skill_dir="${1#--skill-dir=}";  shift ;;
-      --skill-name=*) skill_name="${1#--skill-name=}"; shift ;;
       --) saw_sep=1; shift; break ;;
       *)
         err "Unexpected flag before '--': $1"
@@ -60,14 +59,17 @@ main() {
     esac
   done
 
-  if [ -z "$skill_dir" ] || [ -z "$skill_name" ]; then
-    err "--skill-dir and --skill-name are required."
+  if [ -z "$skill_dir" ]; then
+    err "--skill-dir is required."
     exit 11
   fi
   if [ "$saw_sep" -eq 0 ]; then
     err "Missing '--' separator before user args."
     exit 11
   fi
+
+  local skill_name
+  skill_name="$(basename "$skill_dir")"
 
   # --help must short-circuit before the update check so the help output
   # stays clean (no notice prepended to the rendered help page).
