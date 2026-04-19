@@ -77,30 +77,27 @@ ensure_src_checkout() {
   mkdir -p "$KSTACK_CONFIG_DIR"
   local tag
   if [ -d "$KSTACK_UPSTREAM/.git" ]; then
-    log "Updating $KSTACK_UPSTREAM"
     git -C "$KSTACK_UPSTREAM" fetch --tags --quiet origin
     tag="$(git -C "$KSTACK_UPSTREAM" tag -l 'v*' --sort=-v:refname | head -1)"
     if [ -n "$tag" ]; then
       git -C "$KSTACK_UPSTREAM" checkout --quiet "$tag"
-      log "  checked out $tag"
     else
-      log "  no tagged release found; tracking main"
       git -C "$KSTACK_UPSTREAM" checkout --quiet main
       git -C "$KSTACK_UPSTREAM" pull --ff-only --quiet origin main
       tag="main"
     fi
+    log "   📥 Upstream   → $KSTACK_UPSTREAM @ $tag"
   else
     tag="$(git ls-remote --tags "$KSTACK_REMOTE_URL" 'v*' 2>/dev/null \
       | awk -F'refs/tags/' '/refs\/tags\/v[0-9]/ && !/\^\{\}$/ { print $2 }' \
       | sort -V | tail -1)"
     if [ -n "$tag" ]; then
-      log "Cloning kstack @ $tag into $KSTACK_UPSTREAM"
       git clone --depth 1 --branch "$tag" --quiet "$KSTACK_REMOTE_URL" "$KSTACK_UPSTREAM"
     else
-      log "No tagged release found; cloning main into $KSTACK_UPSTREAM"
       git clone --depth 1 --branch main --quiet "$KSTACK_REMOTE_URL" "$KSTACK_UPSTREAM"
       tag="main"
     fi
+    log "   📥 Upstream   → $KSTACK_UPSTREAM @ $tag (cloned)"
   fi
   write_install_conf "$KSTACK_CONFIG_DIR" "$tag"
 }
@@ -189,7 +186,7 @@ prune_orphans() {
       *" $base "*) continue ;;
     esac
     rm -rf "$entry"
-    log "    pruned: ${label}${base}"
+    log "   🗑  pruned: ${label}${base}"
   done
 }
 
@@ -220,8 +217,11 @@ install_agent() {
     slots="$slots $slot"
   done
 
-  log "  $agent ($mode) → $skills_dir"
-  log "    installed:$slots"
+  local n=0
+  for _ in $slots; do n=$((n + 1)); done
+  local plural=s
+  [ "$n" = 1 ] && plural=""
+  log "   🤖 $agent   → $skills_dir  ($n skill$plural)"
 
   # Prune stale slots from prior installs. When slot_prefix is "kstack-", the
   # glob scopes pruning to kstack-* so user-owned skills in a shared skills
@@ -245,7 +245,6 @@ sync_dir() {
     [ "$executable" = 1 ] && chmod +x "$dst/$name"
     keep="$keep $name"
   done
-  log "  $label → $dst"
   prune_orphans "$dst" "$glob" "${keep# }" "$label"
 }
 
@@ -274,7 +273,6 @@ copy_lib() {
     name="${d%/}"; name="${name##*/}"
     rm -rf "${dst:?}/$name"
     cp -R "$d" "$dst/$name"
-    log "  lib/$name/ → $dst/$name"
     keep="$keep $name"
   done
   prune_orphans "$dst" '*/' "${keep# }" "lib/"
@@ -332,11 +330,15 @@ main() {
   # REPO_ROOT is the top of the source checkout (holds README.md and the
   # src/ subdir). SRC_ROOT is the src/ subdir itself (holds skills/, lib/, bin/).
   if [ "$GLOBAL" -eq 1 ]; then
+    log "🚀 Installing kstack (global) ·$(printf ' %s' $TARGET_AGENTS)"
+    log ""
     ensure_src_checkout
     REPO_ROOT="$KSTACK_UPSTREAM"
     SRC_ROOT="$KSTACK_UPSTREAM/src"
     ROOT_DIR="$KSTACK_CONFIG_DIR"
   else
+    log "🚀 Installing kstack (local) ·$(printf ' %s' $TARGET_AGENTS)"
+    log ""
     REPO_ROOT="$SCRIPT_DIR"
     SRC_ROOT="$SCRIPT_DIR/src"
     ROOT_DIR="$REPO_ROOT/.kstack"
@@ -373,18 +375,18 @@ main() {
   done
 
   mkdir -p "$ROOT_DIR/cache"
+
   copy_bin "$SRC_ROOT/bin" "$ROOT_DIR/bin"
   copy_lib "$SRC_ROOT/lib" "$LIB_DIR"
+  log "   📦 Helpers    → $ROOT_DIR"
 
   if [ "$GLOBAL" -eq 1 ]; then
-    log "Installing kstack (global) for:$(printf ' %s' $TARGET_AGENTS)"
     # install.conf is written by ensure_src_checkout.
     for h in $TARGET_AGENTS; do
       install_agent global "$h" "$ROOT_DIR" \
         "$(agent_skills_dir_global "$h")" "kstack-"
     done
   else
-    log "Installing kstack (local) for:$(printf ' %s' $TARGET_AGENTS)"
     write_local_install_conf "$ROOT_DIR" "$REPO_ROOT"
     for h in $TARGET_AGENTS; do
       install_agent local "$h" "$ROOT_DIR" \
@@ -393,13 +395,14 @@ main() {
   fi
 
   log ""
-  log "kstack installed. Start a session with your agent to use the skills."
+  log "✅ kstack installed. Start a session with your agent to use the skills."
+  log ""
   if [ "$GLOBAL" -eq 1 ]; then
-    log "To upgrade:   $ROOT_DIR/bin/upgrade"
-    log "To uninstall: $ROOT_DIR/bin/uninstall"
+    log "   Upgrade:   $ROOT_DIR/bin/upgrade"
+    log "   Uninstall: $ROOT_DIR/bin/uninstall"
   else
-    log "To upgrade:   git pull && ./install  (or $ROOT_DIR/bin/upgrade)"
-    log "To uninstall: delete this kstack repo directory."
+    log "   Upgrade:   git pull && ./install"
+    log "   Uninstall: delete this kstack repo directory."
   fi
 }
 

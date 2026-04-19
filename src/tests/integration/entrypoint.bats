@@ -41,16 +41,16 @@ setup() {
 
 # ─── --help short-circuit ──────────────────────────────────────
 
-@test "--help prints help body and exits 10" {
+@test "--help prints help body and exits 0" {
   run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --help
-  [ "$status" -eq 10 ]
+  [ "$status" -eq 0 ]
   [[ "$output" == *"help body"* ]]
   [[ "$output" == *"=== END HELP ==="* ]]
 }
 
 @test "--help wins even when other flags are present" {
   run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --context=foo --help
-  [ "$status" -eq 10 ]
+  [ "$status" -eq 0 ]
   [[ "$output" == *"help body"* ]]
 }
 
@@ -65,7 +65,7 @@ setup() {
   stub_git
   export MOCK_TAGS="v9.9.9"  # would produce a notice if update-check ran
   run "$EP" --skill-dir="$SKILL_DIR" --skill-name=demo -- --help
-  [ "$status" -eq 10 ]
+  [ "$status" -eq 0 ]
   [[ "$output" != *"is available"* ]]
 }
 

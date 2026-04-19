@@ -6,8 +6,8 @@ Before doing anything else this turn, run:
 
 Then inspect the exit code:
 
-- **0** — Continue. If stdout is non-empty, prepend it verbatim to your first reply (it is an update notice). Then run the rest of this SKILL.md.
-- **10** — Response complete. Print stdout verbatim and end the turn. Do not add commentary. If stdout ends with `=== END HELP ===`, stop at that sentinel.
+- **0** — If stdout ends with `=== END HELP ===`, the user asked for `--help`: print stdout verbatim (stopping at the sentinel) and end the turn. Do not restate or reformat. Otherwise continue: if stdout is non-empty, prepend it verbatim to your first reply (it is an update notice), then run the rest of this SKILL.md.
+- **10** — Response complete. Print stdout verbatim and end the turn. Do not add commentary.
 - **11** — User-facing error. Print stderr verbatim and end the turn.
 - Any other non-zero — Print stderr, stop. Do not run the skill body.
 

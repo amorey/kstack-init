@@ -78,7 +78,7 @@ main() {
       exit 11
     fi
     cat "$help_file"
-    exit 10
+    exit 0
   fi
 
   run_update_check

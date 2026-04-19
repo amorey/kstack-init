@@ -33,17 +33,21 @@ REPO="kubetail-org/kstack"
 UPSTREAM_DIR="$HOME/.config/kstack/upstream"
 
 main() {
+  echo "🔍 Resolving latest kstack release…"
   TAG=$(curl -sS "https://api.github.com/repos/$REPO/releases/latest" \
           | grep -o '"tag_name":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
   [ -n "$TAG" ] || { echo "Could not resolve latest kstack release." >&2; exit 1; }
 
   if [ -d "$UPSTREAM_DIR/.git" ]; then
+    echo "📥 Updating kstack @ $TAG…"
     git -C "$UPSTREAM_DIR" fetch --tags --quiet
     git -C "$UPSTREAM_DIR" checkout --quiet "$TAG"
   else
+    echo "📥 Fetching kstack @ $TAG…"
     mkdir -p "$(dirname "$UPSTREAM_DIR")"
     git clone --depth 1 --branch "$TAG" --quiet "https://github.com/$REPO.git" "$UPSTREAM_DIR"
   fi
+  echo ""
 
   exec "$UPSTREAM_DIR/install" --global "$@"
 }
