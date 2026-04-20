@@ -92,3 +92,23 @@ exec \"\$REAL_GIT\" \"\${args[@]}\"
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--global"* ]]
 }
+
+@test "scripts/install.sh --local clones into \$PWD/.kstack/upstream and execs install --local" {
+  PROJECT="$TMPDIR_TEST/proj"
+  mkdir -p "$PROJECT"
+  cd "$PROJECT"
+  run "$REPO_ROOT/scripts/install.sh" --local
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"INSTALL-RAN:--local"* ]]
+  [ -d "$PROJECT/.kstack/upstream/.git" ]
+  [ ! -d "$HOME/.config/kstack/upstream" ]
+}
+
+@test "scripts/install.sh --local forwards extra args to install" {
+  PROJECT="$TMPDIR_TEST/proj"
+  mkdir -p "$PROJECT"
+  cd "$PROJECT"
+  run "$REPO_ROOT/scripts/install.sh" --local --agent claude
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"INSTALL-RAN:--local --agent claude"* ]]
+}

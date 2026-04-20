@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# scripts/clean.sh — wipe repo-local install artifacts.
+# scripts/clean.sh — wipe dev-mode install artifacts.
 #
 # For development. Removes the rendered skills directories, caches, and the
 # legacy build dir from the kstack repo so you can re-run ./install against
@@ -26,7 +26,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Paths the repo-local install (and older versions of it) can write into.
+# Paths a dev-mode install (and older versions of it) can write into.
 # Keep this list in sync with .gitignore.
 PATHS="
   .claude

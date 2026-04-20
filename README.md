@@ -55,26 +55,28 @@ This bootstrap script installs the kstack skills into your Claude user-level ski
 ───────────────────────────────────
 ```
 
-Alternatively, you can install kstack in repo-local mode to make the skills available only to sessions started from inside this repo directory:
+Alternatively, you can install kstack locally so the skills are only available from inside one project directory:
 
 ```console
-git clone https://github.com/kubetail-org/kstack.git
-cd kstack && ./install
+mkdir myproject && cd myproject
+curl -sS https://kubestack.xyz/install.sh | bash -s -- --local
 ```
 
-The skills are rendered into `.claude/skills/` (and the equivalent dir for any other agent CLI detected on your `PATH`), so they're discoverable the moment you start a session from the repo:
+This drops a self-contained `.kstack/` into the current directory and renders skills into `./.claude/skills/kstack-*/` (plus the equivalent dir for every other agent CLI on your `PATH`). Start your agent from that directory and the skills are discoverable right away:
 
 ```console
 ───────────────────────────────────
-> /cluster-status
+> /kstack-cluster-status
 ───────────────────────────────────
 ```
+
+Re-running the bootstrap is safe — it overwrites the existing local install with the latest released version. You can run `--local` from any directory, not just an empty one, to attach kstack to an existing project.
 
 Kstack uses your local `kubeconfig` file for authentication so it will be able to use your RBAC permissions to perform actions on your behalf. If it runs into permissions problems, it will let you know.
 
 ## Other AI Agents
 
-Kstack works with any AI agent that supports skills, not just Claude. Both `./install` and the curl bootstrap auto-detect which agent CLIs are on your `PATH` and install for each. You can target a specific agent with `install --agent <name>`:
+Kstack works with any AI agent that supports skills, not just Claude. The curl bootstrap auto-detects which agent CLIs are on your `PATH` and installs for each. You can target a specific agent with `--agent <name>`:
 
 | Agent            | Flag               | Global install path                   |
 |------------------|--------------------|---------------------------------------|
@@ -86,7 +88,7 @@ Kstack works with any AI agent that supports skills, not just Claude. Both `./in
 | Kiro             | `--agent kiro`     | `~/.kiro/skills/kstack-*/`            |
 | Hermes           | `--agent hermes`   | `~/.hermes/skills/kstack-*/`          |
 
-Repo-local installs mirror this structure under the repo (e.g. `<repo>/.codex/skills/`) and are used only when the agent is run from inside the repo.
+Local installs mirror this structure under the project directory (e.g. `<project>/.codex/skills/kstack-*/`) and are picked up only when the agent is run from inside that directory.
 
 ## Skills Reference
 
@@ -403,29 +405,33 @@ Clear kstack's local cache and discard what it learned about your cluster(s).
 
 ## Upgrade
 
-When you run a kstack skill, agent quietly checks whether a newer kstack release is available and surfaces a one-line notice at the top of its response when it finds one. Just say **"upgrade kstack"** and the agent will run the kstack upgrade script on your behalf; say **"dismiss"** to hide the notice until the next release. This works the same for both global and repo-local installs.
+When you run a kstack skill, agent quietly checks whether a newer kstack release is available and surfaces a one-line notice at the top of its response when it finds one. Just say **"upgrade kstack"** and the agent will run the kstack upgrade script on your behalf; say **"dismiss"** to hide the notice until the next release. This works the same for both global and local installs.
 
-You can also run the helpers directly:
+You can also run the helper directly:
 
 ```console
 # Global install
 ~/.config/kstack/bin/upgrade
 
-# Repo-local install
-git pull && ./install
+# Local install (from the project directory)
+./.kstack/bin/upgrade
 ```
 
 Upgrades are idempotent and safe to run any time.
 
 ## Uninstall
 
-For a global install, run the uninstall helper bundled at `~/.config/kstack/bin/`:
+Run the uninstall helper bundled with your install:
 
 ```console
+# Global install
 ~/.config/kstack/bin/uninstall
+
+# Local install (from the project directory)
+./.kstack/bin/uninstall
 ```
 
-For a repo-local install, just delete the kstack repo directory. The local install renders skills directly into `<repo>/.<agent>/skills/` and never writes outside the repo, so there is nothing else to clean up.
+Both helpers prompt before removing. They clear the install root (`~/.config/kstack` or `<project>/.kstack`) and every kstack-owned skill slot, leaving user-authored skills in the same agent dirs untouched.
 
 ## Development
 

@@ -20,8 +20,11 @@ setup() {
 }
 
 @test "upgrade in global location execs upstream/install --global" {
-  # Stage a fake global install.
+  # Stage a fake global install. The upgrade helper checks for an upstream
+  # git checkout to distinguish managed installs from dev installs, so the
+  # mocked upstream/ needs to be an actual (even if empty) git repo.
   mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/upstream"
+  git init --quiet "$HOME/.config/kstack/upstream"
   cp "$SRC_ROOT/bin/upgrade" "$HOME/.config/kstack/bin/upgrade"
   chmod +x "$HOME/.config/kstack/bin/upgrade"
   cat > "$HOME/.config/kstack/upstream/install" <<'EOF'
@@ -35,33 +38,23 @@ EOF
   [[ "$output" == *"GLOBAL-INSTALL:--global --extra"* ]]
 }
 
-@test "upgrade in repo-local location git-pulls then execs ./install" {
-  # Stage a fake repo with the installed layout under .kstack/.
-  FAKE_REPO="$TMPDIR_TEST/fake-repo"
-  BARE="$TMPDIR_TEST/fake-repo.git"
-  mkdir -p "$FAKE_REPO/.kstack/bin" "$BARE"
-
-  git init --quiet --bare "$BARE"
-  git -c init.defaultBranch=main init --quiet "$FAKE_REPO"
-  (
-    cd "$FAKE_REPO"
-    git config user.email "test@example.com"
-    git config user.name "Test"
-    cat > install <<'EOF'
+@test "upgrade in local layout execs upstream/install --local from project dir" {
+  # Stage a fake local install: <project>/.kstack/{bin,upstream/.git,…}.
+  PROJECT="$TMPDIR_TEST/proj"
+  mkdir -p "$PROJECT/.kstack/bin" "$PROJECT/.kstack/upstream"
+  git init --quiet "$PROJECT/.kstack/upstream"  # make it look like a checkout
+  cp "$SRC_ROOT/bin/upgrade" "$PROJECT/.kstack/bin/upgrade"
+  chmod +x "$PROJECT/.kstack/bin/upgrade"
+  cat > "$PROJECT/.kstack/upstream/install" <<EOF
 #!/usr/bin/env bash
-echo "LOCAL-INSTALL:$*"
+echo "LOCAL-INSTALL:\$*:pwd=\$PWD"
 EOF
-    chmod +x install
-    cp "$SRC_ROOT/bin/upgrade" .kstack/bin/upgrade
-    chmod +x .kstack/bin/upgrade
-    git add -A
-    git commit --quiet -m "init"
-    git branch -M main
-    git remote add origin "$BARE"
-    git push --quiet -u origin main
-  )
+  chmod +x "$PROJECT/.kstack/upstream/install"
 
-  run "$FAKE_REPO/.kstack/bin/upgrade" --foo
+  run "$PROJECT/.kstack/bin/upgrade" --extra
   [ "$status" -eq 0 ]
-  [[ "$output" == *"LOCAL-INSTALL:--foo"* ]]
+  [[ "$output" == *"LOCAL-INSTALL:--local --extra"* ]]
+  # Upgrade must cd into the project dir so the installer's $PWD-based
+  # ROOT_DIR resolution points back at <project>/.kstack.
+  [[ "$output" == *"pwd=$PROJECT"* ]]
 }

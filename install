@@ -16,32 +16,40 @@
 
 # kstack install — install kstack skills for one or more AI agents.
 #
-# Two install modes:
+# Three install modes:
 #
-#   Repo-local (default) — for the `cd kstack && claude` flow.
-#     Renders each src/skills/<skill>/SKILL.md.tmpl directly into
-#     <repo>/.<agent>/skills/<skill>/SKILL.md. Skills are discovered
-#     from the repo when the agent is invoked from inside it.
+#   Dev (default, from a git clone) — for contributors hacking on kstack.
+#     Reads sources from $SCRIPT_DIR/src/ and writes outputs next to this
+#     script at <repo>/.kstack/ and <repo>/.<agent>/skills/<skill>/. Lets
+#     a contributor iterate on skills without a separate publish step.
+#     Upgrade via `git pull && ./install`.
 #
-#   Global (--global) — for ambient use outside the repo.
+#   Local (--local) — for end users who want kstack scoped to one project.
+#     Maintains a kstack-owned checkout at <cwd>/.kstack/upstream/ at the
+#     latest released tag, then renders skills into <cwd>/.<agent>/skills/
+#     <skill>/. The bootstrap at https://kubestack.xyz/install.sh drives
+#     this mode via `curl … | bash -s -- --local`.
+#
+#   Global (--global) — for ambient use outside any project.
 #     Maintains a kstack-owned checkout at ~/.config/kstack/upstream/ at
 #     the latest released tag, then renders skills from there into
 #     ~/.<agent>/skills/kstack-<skill>/SKILL.md and copies helper binaries
-#     into ~/.config/kstack/bin/. The invoker's checkout is never used
-#     as the source in global mode — the canonical upstream is cloned
-#     fresh so running `./install --global` from a fork cannot silently
-#     install the fork's contents.
+#     into ~/.config/kstack/bin/.
+#
+# --local and --global never use the invoker's checkout as the source; the
+# canonical upstream is always cloned/updated fresh, so running these from
+# a fork cannot silently install the fork's contents.
 #
 # Upgrade:
-#     Repo-local: `git pull && ./install`
-#     Global:     `~/.config/kstack/bin/upgrade` (wrapper that re-runs
-#                 this script at the latest tag — see below).
+#     Dev:    `git pull && ./install`
+#     Local:  `<cwd>/.kstack/bin/upgrade`
+#     Global: `~/.config/kstack/bin/upgrade`
 #
 # Usage:
-#   ./install                        Repo-local, auto-detect agents (falls back to claude).
+#   ./install                        Dev, auto-detect agents (falls back to claude).
 #   ./install --agent <name>         Limit to one agent.
+#   ./install --local                Local install into $PWD/.kstack.
 #   ./install --global               Global install for auto-detected agents.
-#   ./install --global --agent <n>   Global install, one agent.
 #   ./install -q | --quiet           Suppress log output.
 #
 # Supported agents: claude, codex, opencode, cursor, factory, slate, kiro, hermes
@@ -49,17 +57,16 @@
 set -eu
 
 # SCRIPT_DIR is the repo root (holds this install script, README.md, and the
-# src/ subdir with skills, lib, bin, etc.). In repo-local mode it doubles as
+# src/ subdir with skills, lib, bin, etc.). In dev mode it doubles as
 # REPO_ROOT so install outputs (.kstack/, .<agent>/skills/) land next to
-# this script — users running their agent from the repo root pick them up.
+# this script — contributors running their agent from the repo root pick
+# them up.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # shellcheck source=src/lib/agents.sh
 . "$SCRIPT_DIR/src/lib/agents.sh"
 
 KSTACK_CONFIG_DIR="$HOME/.config/kstack"
-# Global-mode clone target. SRC_ROOT in global mode is $KSTACK_UPSTREAM/src.
-KSTACK_UPSTREAM="$KSTACK_CONFIG_DIR/upstream"
 # Override KSTACK_REMOTE_URL for CI and local-clone testing. Leave unset for
 # normal user installs.
 KSTACK_REMOTE_URL="${KSTACK_REMOTE_URL:-https://github.com/kubetail-org/kstack.git}"
@@ -70,36 +77,39 @@ log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
 # write_install_conf $root $version
 write_install_conf() { printf '%s\n' "$2" > "$1/install.conf"; }
 
-# Clones (first time) or fetches+checks-out (subsequent runs) the canonical
-# upstream at the latest tagged release. Pre-release fallback: if no `v*` tags
-# exist anywhere, use `main` with a visible warning.
+# ensure_src_checkout $upstream_dir $root_dir
+#   Clones (first time) or fetches+checks-out (subsequent runs) the canonical
+#   upstream at the latest tagged release into $upstream_dir, and writes
+#   $root_dir/install.conf with the resolved tag. Pre-release fallback: if no
+#   `v*` tags exist anywhere, use `main` with a visible warning.
 ensure_src_checkout() {
-  mkdir -p "$KSTACK_CONFIG_DIR"
+  local upstream="$1" root="$2"
+  mkdir -p "$root"
   local tag
-  if [ -d "$KSTACK_UPSTREAM/.git" ]; then
-    git -C "$KSTACK_UPSTREAM" fetch --tags --quiet origin
-    tag="$(git -C "$KSTACK_UPSTREAM" tag -l 'v*' --sort=-v:refname | head -1)"
+  if [ -d "$upstream/.git" ]; then
+    git -C "$upstream" fetch --tags --quiet origin
+    tag="$(git -C "$upstream" tag -l 'v*' --sort=-v:refname | head -1)"
     if [ -n "$tag" ]; then
-      git -C "$KSTACK_UPSTREAM" checkout --quiet "$tag"
+      git -C "$upstream" checkout --quiet "$tag"
     else
-      git -C "$KSTACK_UPSTREAM" checkout --quiet main
-      git -C "$KSTACK_UPSTREAM" pull --ff-only --quiet origin main
+      git -C "$upstream" checkout --quiet main
+      git -C "$upstream" pull --ff-only --quiet origin main
       tag="main"
     fi
-    log "   📥 Upstream   → $KSTACK_UPSTREAM @ $tag"
+    log "   📥 Upstream   → $upstream @ $tag"
   else
     tag="$(git ls-remote --tags "$KSTACK_REMOTE_URL" 'v*' 2>/dev/null \
       | awk -F'refs/tags/' '/refs\/tags\/v[0-9]/ && !/\^\{\}$/ { print $2 }' \
       | sort -V | tail -1)"
     if [ -n "$tag" ]; then
-      git clone --depth 1 --branch "$tag" --quiet "$KSTACK_REMOTE_URL" "$KSTACK_UPSTREAM"
+      git clone --depth 1 --branch "$tag" --quiet "$KSTACK_REMOTE_URL" "$upstream"
     else
-      git clone --depth 1 --branch main --quiet "$KSTACK_REMOTE_URL" "$KSTACK_UPSTREAM"
+      git clone --depth 1 --branch main --quiet "$KSTACK_REMOTE_URL" "$upstream"
       tag="main"
     fi
-    log "   📥 Upstream   → $KSTACK_UPSTREAM @ $tag (cloned)"
+    log "   📥 Upstream   → $upstream @ $tag (cloned)"
   fi
-  write_install_conf "$KSTACK_CONFIG_DIR" "$tag"
+  write_install_conf "$root" "$tag"
 }
 
 # render_skill $skill $skill_name $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $entrypoint_partial
@@ -226,10 +236,9 @@ install_agent() {
   [ "$n" = 1 ] && plural=""
   log "   🤖 $agent   → $skills_dir  ($n skill$plural)"
 
-  # Prune stale slots from prior installs. When slot_prefix is "kstack-", the
-  # glob scopes pruning to kstack-* so user-owned skills in a shared skills
-  # dir are never touched; when empty (repo-local), the glob is "*" and the
-  # whole install-owned dir is fair game.
+  # Prune stale slots from prior installs. Every mode uses a kstack- prefix,
+  # so the glob scopes pruning to kstack-* and user-authored skills in a
+  # shared skills dir are never touched.
   prune_orphans "$skills_dir" "${slot_prefix}*" "${slots# }" ""
 }
 
@@ -311,6 +320,7 @@ write_local_install_conf() {
 main() {
   AGENT=""
   GLOBAL=0
+  LOCAL=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --agent)
@@ -318,6 +328,7 @@ main() {
         AGENT="$2"; shift 2 ;;
       --agent=*) AGENT="${1#--agent=}"; shift ;;
       --global) GLOBAL=1; shift ;;
+      --local) LOCAL=1; shift ;;
       -q|--quiet) QUIET=1; shift ;;
       -h|--help)
         sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
@@ -325,6 +336,11 @@ main() {
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
+
+  if [ "$GLOBAL" -eq 1 ] && [ "$LOCAL" -eq 1 ]; then
+    echo "--global and --local are mutually exclusive" >&2
+    exit 1
+  fi
 
   TARGET_AGENTS=""
   if [ -z "$AGENT" ]; then
@@ -347,23 +363,35 @@ main() {
   fi
   TARGET_AGENTS="${TARGET_AGENTS# }"
 
-  # REPO_ROOT is the top of the source checkout (holds README.md and the
-  # src/ subdir). SRC_ROOT is the src/ subdir itself (holds skills/, lib/, bin/).
+  # Resolve mode-specific paths. REPO_ROOT is the top of the source checkout
+  # (holds README.md and the src/ subdir); SRC_ROOT is the src/ subdir itself.
+  # Managed modes (global, local) maintain upstream/ inside ROOT_DIR; dev mode
+  # reads sources directly from $SCRIPT_DIR.
   if [ "$GLOBAL" -eq 1 ]; then
-    # shellcheck disable=SC2086 # intentional word-splitting to format each agent
-    log "🚀 Installing kstack (global) ·$(printf ' %s' $TARGET_AGENTS)"
-    log ""
-    ensure_src_checkout
-    REPO_ROOT="$KSTACK_UPSTREAM"
-    SRC_ROOT="$KSTACK_UPSTREAM/src"
+    MODE=global
     ROOT_DIR="$KSTACK_CONFIG_DIR"
+    LABEL="global"
+  elif [ "$LOCAL" -eq 1 ]; then
+    MODE=local
+    ROOT_DIR="$PWD/.kstack"
+    LABEL="local → $PWD"
   else
-    # shellcheck disable=SC2086 # intentional word-splitting to format each agent
-    log "🚀 Installing kstack (local) ·$(printf ' %s' $TARGET_AGENTS)"
-    log ""
+    MODE=dev
+    ROOT_DIR="$SCRIPT_DIR/.kstack"
+    LABEL="dev"
+  fi
+
+  # shellcheck disable=SC2086 # intentional word-splitting to format each agent
+  log "🚀 Installing kstack ($LABEL) ·$(printf ' %s' $TARGET_AGENTS)"
+  log ""
+
+  if [ "$MODE" = dev ]; then
     REPO_ROOT="$SCRIPT_DIR"
     SRC_ROOT="$SCRIPT_DIR/src"
-    ROOT_DIR="$REPO_ROOT/.kstack"
+  else
+    ensure_src_checkout "$ROOT_DIR/upstream" "$ROOT_DIR"
+    REPO_ROOT="$ROOT_DIR/upstream"
+    SRC_ROOT="$REPO_ROOT/src"
   fi
   LIB_DIR="$ROOT_DIR/lib"
 
@@ -403,29 +431,31 @@ main() {
   copy_schemas "$SRC_ROOT/schemas" "$ROOT_DIR/schemas"
   log "   📦 Helpers    → $ROOT_DIR"
 
-  if [ "$GLOBAL" -eq 1 ]; then
-    # install.conf is written by ensure_src_checkout.
-    for h in $TARGET_AGENTS; do
-      install_agent "$h" "$ROOT_DIR" \
-        "$(agent_skills_dir_global "$h")" "kstack-"
-    done
-  else
-    write_local_install_conf "$ROOT_DIR" "$REPO_ROOT"
-    for h in $TARGET_AGENTS; do
-      install_agent "$h" "$ROOT_DIR" \
-        "$(agent_skills_dir_local "$REPO_ROOT" "$h")" ""
-    done
-  fi
+  # Managed modes have install.conf already written by ensure_src_checkout;
+  # dev mode stamps it from the current git checkout.
+  [ "$MODE" = dev ] && write_local_install_conf "$ROOT_DIR" "$REPO_ROOT"
+
+  # Every mode renders slots as kstack-<skill>. Uniform naming means pruning
+  # uses the same kstack-* glob everywhere, so user-authored skills in a
+  # shared agent dir are safe from cleanup on re-install.
+  for h in $TARGET_AGENTS; do
+    case "$MODE" in
+      global) skills_dir="$(agent_skills_dir_global "$h")" ;;
+      local)  skills_dir="$(agent_skills_dir_local "$PWD" "$h")" ;;
+      dev)    skills_dir="$(agent_skills_dir_local "$SCRIPT_DIR" "$h")" ;;
+    esac
+    install_agent "$h" "$ROOT_DIR" "$skills_dir" "kstack-"
+  done
 
   log ""
   log "✅ kstack installed. Start a session with your agent to use the skills."
   log ""
-  if [ "$GLOBAL" -eq 1 ]; then
-    log "   Upgrade:   $ROOT_DIR/bin/upgrade"
-    log "   Uninstall: $ROOT_DIR/bin/uninstall"
-  else
+  if [ "$MODE" = dev ]; then
     log "   Upgrade:   git pull && ./install"
     log "   Uninstall: delete this kstack repo directory."
+  else
+    log "   Upgrade:   $ROOT_DIR/bin/upgrade"
+    log "   Uninstall: $ROOT_DIR/bin/uninstall"
   fi
 }
 

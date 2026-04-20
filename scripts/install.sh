@@ -18,22 +18,44 @@
 #
 # Intended for use via:
 #
-#     curl -sS https://kubestack.xyz/install.sh | bash
+#     curl -sS https://kubestack.xyz/install.sh | bash             # global
+#     curl -sS https://kubestack.xyz/install.sh | bash -s -- --local
 #
 # Resolves the latest tagged release of kstack, clones (or updates) a
-# kstack-owned checkout at ~/.config/kstack/upstream/, then hands off to
-# the in-repo `install` wrapper in that checkout. All substantive logic
-# lives in the in-repo install scripts — this bootstrap is just a getter.
+# kstack-owned checkout under the chosen root, then hands off to the
+# in-repo `install` wrapper in that checkout. All substantive logic lives
+# in the in-repo install scripts — this bootstrap is just a getter.
+#
+# Modes:
+#   (default)   Global install. Upstream checkout at
+#               ~/.config/kstack/upstream/, skills into ~/.<agent>/skills/.
+#   --local     Local install. Upstream checkout at $PWD/.kstack/upstream/,
+#               skills into $PWD/.<agent>/skills/. Overwrites any existing
+#               .kstack/ in the current directory.
 #
 # This script is duplicated verbatim in the kubetail-website repo's
 # static assets. When editing this file, update both copies.
 set -eu
 
 REPO="kubetail-org/kstack"
-UPSTREAM_DIR="$HOME/.config/kstack/upstream"
 
 main() {
-  echo "🔍 Resolving latest kstack release…"
+  # --local/--global decide where the upstream checkout lands; we leave the
+  # flag in "$@" so the in-repo installer sees it too. Any other args pass
+  # through unchanged.
+  case " $* " in
+    *" --local "*)
+      ROOT="$PWD/.kstack"
+      LABEL="local → $PWD"
+      ;;
+    *)
+      ROOT="$HOME/.config/kstack"
+      LABEL="global"
+      ;;
+  esac
+  UPSTREAM_DIR="$ROOT/upstream"
+
+  echo "🔍 Resolving latest kstack release ($LABEL)…"
   TAG=$(curl -sS "https://api.github.com/repos/$REPO/releases/latest" \
           | grep -o '"tag_name":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
   [ -n "$TAG" ] || { echo "Could not resolve latest kstack release." >&2; exit 1; }
@@ -49,7 +71,11 @@ main() {
   fi
   echo ""
 
-  exec "$UPSTREAM_DIR/install" --global "$@"
+  # When no mode flag was passed, default to --global (historical behavior).
+  case " $* " in
+    *" --global "*|*" --local "*) exec "$UPSTREAM_DIR/install" "$@" ;;
+    *) exec "$UPSTREAM_DIR/install" --global "$@" ;;
+  esac
 }
 
 if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
