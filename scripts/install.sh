@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# kstack bootstrap — hosted at https://www.kubestack.xyz/install.sh
+# kstack bootstrap — hosted at https://kubestack.xyz/install.sh
 #
 # Intended for use via:
 #
-#     curl -sS https://www.kubestack.xyz/install.sh | bash
+#     curl -sS https://kubestack.xyz/install.sh | bash
 #
 # Resolves the latest tagged release of kstack, clones (or updates) a
 # kstack-owned checkout at ~/.config/kstack/upstream/, then hands off to

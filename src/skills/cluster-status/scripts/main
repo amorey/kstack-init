@@ -18,6 +18,15 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
+# Bootstrap before anything that could fail: we need response::* to emit
+# any error envelope back to the agent.
+if [ -z "${KSTACK_ROOT:-}" ]; then
+  printf '{"kstack":"1","status":"error","kind":"infra","message":"KSTACK_ROOT not set; run this script via the skill entrypoint."}\n'
+  exit 0
+fi
+
+# shellcheck source=/dev/null
+. "$KSTACK_ROOT/lib/response.sh"
 # shellcheck source=lib/cluster-info.sh
 . "$SCRIPT_DIR/lib/cluster-info.sh"
 # shellcheck source=lib/node-info.sh
@@ -25,7 +34,54 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=lib/pod-info.sh
 . "$SCRIPT_DIR/lib/pod-info.sh"
 
-err() { printf '%s\n' "$*" >&2; }
+parse_ttl_seconds() {
+  local v="$1" n=""
+  case "$v" in
+    *s) n="${v%s}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$n" && return 0 ;;
+    *m) n="${v%m}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$(( n * 60 ))" && return 0 ;;
+    *h) n="${v%h}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$(( n * 3600 ))" && return 0 ;;
+    *d) n="${v%d}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$(( n * 86400 ))" && return 0 ;;
+  esac
+  return 1
+}
+
+context_sha() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s' "$1" | sha256sum | awk '{print substr($1,1,12)}'
+  elif command -v shasum >/dev/null 2>&1; then
+    printf '%s' "$1" | shasum -a 256 | awk '{print substr($1,1,12)}'
+  else
+    printf '%s' "$1" | tr -c 'A-Za-z0-9' _ | cut -c1-40
+  fi
+}
+
+file_mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
+is_fresh() {
+  local file="$1" ttl="$2" mt now
+  [ -f "$file" ] || return 1
+  mt="$(file_mtime "$file")" || return 1
+  [ -n "$mt" ] || return 1
+  now="$(date +%s)"
+  [ "$(( now - mt ))" -lt "$ttl" ]
+}
+
+# ensure_cache <file> <ttl_secs> <refresh> <fetch_cmd...>
+# Atomic-replaces <file> with stdout of fetch_cmd when stale or refreshed.
+ensure_cache() {
+  local file="$1" ttl="$2" refresh="$3"
+  shift 3
+  if [ "$refresh" != "true" ] && is_fresh "$file" "$ttl"; then
+    return 0
+  fi
+  if ! "$@" > "$file.tmp" 2>/dev/null; then
+    rm -f "$file.tmp"
+    return 1
+  fi
+  mv "$file.tmp" "$file"
+}
 
 main() {
   local context=""
@@ -36,36 +92,108 @@ main() {
       --context=*) context="${1#--context=}"; shift ;;
       --context)
         if [ $# -lt 2 ]; then
-          err "Flag --context requires a value."
-          exit 11
+          response::user_error "Flag --context requires a value."
+          exit 0
         fi
         context="$2"; shift 2 ;;
       --refresh) refresh="true"; shift ;;
       --ttl=*) ttl="${1#--ttl=}"; shift ;;
       --ttl)
         if [ $# -lt 2 ]; then
-          err "Flag --ttl requires a value."
-          exit 11
+          response::user_error "Flag --ttl requires a value."
+          exit 0
         fi
         ttl="$2"; shift 2 ;;
       *)
-        err "Unknown flag \`$1\`. Run \`/$KSTACK_SKILL_NAME --help\` for usage."
-        exit 11 ;;
+        response::user_error "Unknown flag \`$1\`. Run \`/${KSTACK_SKILL_NAME:-cluster-status} --help\` for usage."
+        exit 0 ;;
     esac
   done
 
+  local ttl_secs
+  if ! ttl_secs="$(parse_ttl_seconds "$ttl")"; then
+    response::user_error "Invalid --ttl value \`$ttl\`. Use durations like 30s, 15m, 2h, 1d."
+    exit 0
+  fi
+
   if [ -z "$context" ]; then
     if ! context="$(kubectl config current-context 2>/dev/null)" || [ -z "$context" ]; then
-      err "Unable to determine current context. Set one with kubectl or pass --context."
-      exit 11
+      response::user_error "Unable to determine current context. Set one with kubectl or pass --context."
+      exit 0
     fi
   fi
 
-  cluster_info::fetch "$context" "$refresh" "$ttl" || exit 11
-  printf '\n'
-  node_info::fetch "$context" "$refresh" "$ttl" || exit 11
-  printf '\n'
-  pod_info::fetch "$context" "$refresh" "$ttl" || exit 11
+  local sha dir
+  sha="$(context_sha "$context")"
+  dir="$KSTACK_ROOT/cache/cluster-status/$sha"
+  if ! mkdir -p "$dir" 2>/dev/null; then
+    response::infra_error "Unable to create cache dir: $dir"
+    exit 0
+  fi
+
+  local cluster_file="$dir/cluster.json"
+  local nodes_file="$dir/nodes.json"
+  local pods_file="$dir/pods.json"
+
+  if ! ensure_cache "$cluster_file" "$ttl_secs" "$refresh" \
+      kubectl --context="$context" version -o json; then
+    # shellcheck disable=SC2016
+    response::infra_error "$(printf 'Unable to fetch cluster version for context `%s`.' "$context")"
+    exit 0
+  fi
+
+  if ! ensure_cache "$nodes_file" "$ttl_secs" "$refresh" \
+      kubectl --context="$context" get nodes -o json; then
+    # shellcheck disable=SC2016
+    response::infra_error "$(printf 'Unable to list nodes for context `%s`.' "$context")"
+    exit 0
+  fi
+
+  if ! ensure_cache "$pods_file" "$ttl_secs" "$refresh" \
+      kubectl --context="$context" get pods --all-namespaces -o json; then
+    # shellcheck disable=SC2016
+    response::infra_error "$(printf 'Unable to list pods for context `%s`.' "$context")"
+    exit 0
+  fi
+
+  local err_tmp
+  err_tmp="$(mktemp 2>/dev/null || echo "/tmp/kstack-cs-err-$$")"
+  # shellcheck disable=SC2064  # expand err_tmp now so trap fires with the right value
+  trap "rm -f '$err_tmp'" EXIT
+
+  local content block
+  if ! block="$(cluster_info::render "$context" "$cluster_file" 2>"$err_tmp")"; then
+    response::infra_error "$(cat "$err_tmp")"
+    exit 0
+  fi
+  content="$block"
+  content+=$'\n\n'
+
+  if ! block="$(node_info::render "$nodes_file" 2>"$err_tmp")"; then
+    response::infra_error "$(cat "$err_tmp")"
+    exit 0
+  fi
+  content+="$block"
+  content+=$'\n'
+
+  if ! block="$(pod_info::render "$pods_file" 2>"$err_tmp")"; then
+    response::infra_error "$(cat "$err_tmp")"
+    exit 0
+  fi
+  content+="$block"
+  # shellcheck disable=SC2016  # backticks render as inline code in markdown
+  content+=$'\n\nSnapshot cached. Ask to drill in — e.g. "show full pod table", "pods on <node>", "which nodes are tainted".'
+
+  # agent_context: skill-specific follow-up metadata. Compact JSON so future
+  # fields can be added without schema churn. Values are JSON-escaped inline
+  # since we only carry short path/identifier strings.
+  local ctx_esc dir_esc agent_ctx
+  ctx_esc="$(printf '%s' "$context" | response::_escape)"
+  dir_esc="$(printf '%s' "$dir" | response::_escape)"
+  agent_ctx="$(printf '{"cache_dir":"%s","context":"%s"}' "$dir_esc" "$ctx_esc")"
+
+  response::ok_verbatim "$content" "$agent_ctx"
+  exit 0
 }
 
 main "$@"

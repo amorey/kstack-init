@@ -24,6 +24,7 @@ setup() {
   cp "$SRC_ROOT/bin/entrypoint"      "$ROOT/bin/entrypoint"
   cp "$SRC_ROOT/lib/cache.sh"        "$ROOT/lib/cache.sh"
   cp "$SRC_ROOT/lib/update-check.sh" "$ROOT/lib/update-check.sh"
+  cp "$SRC_ROOT/lib/response.sh"     "$ROOT/lib/response.sh"
   chmod +x "$ROOT/bin/entrypoint"
   CACHE_FILE="$ROOT/cache/update.json"
   EP="$ROOT/bin/entrypoint"
@@ -31,7 +32,7 @@ setup() {
   # A rendered skill slot — what {{SKILL_DIR}} resolves to post-install.
   SKILL_DIR="$HOME/.claude/skills/demo"
   mkdir -p "$SKILL_DIR/references" "$SKILL_DIR/scripts"
-  printf 'help body\n=== END HELP ===\n' > "$SKILL_DIR/references/help.md"
+  printf 'help body\n' > "$SKILL_DIR/references/help.md"
 
   # Installed version — non-main so the update check engages.
   echo "v1.0.0" > "$ROOT/install.conf"
@@ -39,39 +40,80 @@ setup() {
 
 # stub_git (and stub_git --fail) are provided by test_helper.bash.
 
+# Tiny jq-free field extractor for bats assertions. Assumes simple envelopes
+# with no nested objects (which is the whole schema).
+envelope_field() {
+  local json="$1" field="$2"
+  printf '%s' "$json" | awk -v f="$field" '
+    {
+      s = $0
+      pat = "\"" f "\":\""
+      i = index(s, pat)
+      if (i == 0) exit 0
+      s = substr(s, i + length(pat))
+      out = ""
+      while (length(s) > 0) {
+        c = substr(s, 1, 1)
+        if (c == "\\") {
+          n = substr(s, 2, 1)
+          if (n == "n") out = out "\n"
+          else if (n == "t") out = out "\t"
+          else if (n == "r") out = out "\r"
+          else out = out n
+          s = substr(s, 3)
+        } else if (c == "\"") {
+          print out
+          exit 0
+        } else {
+          out = out c
+          s = substr(s, 2)
+        }
+      }
+    }
+  '
+}
+
 # ─── --help short-circuit ──────────────────────────────────────
 
-@test "--help prints help body and exits 0" {
+@test "--help emits ok/verbatim envelope with help body" {
   run "$EP" --skill-dir="$SKILL_DIR" -- --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"help body"* ]]
-  [[ "$output" == *"=== END HELP ==="* ]]
+  [[ "$output" == *'"kstack":"1"'* ]]
+  [[ "$output" == *'"status":"ok"'* ]]
+  [[ "$output" == *'"render":"verbatim"'* ]]
+  content="$(envelope_field "$output" content)"
+  [[ "$content" == *"help body"* ]]
 }
 
 @test "--help wins even when other flags are present" {
   run "$EP" --skill-dir="$SKILL_DIR" -- --context=foo --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"help body"* ]]
+  [[ "$output" == *'"render":"verbatim"'* ]]
+  content="$(envelope_field "$output" content)"
+  [[ "$content" == *"help body"* ]]
 }
 
-@test "--help with missing help.md exits 11 with install-bug message" {
+@test "--help with missing help.md emits infra error envelope" {
   rm "$SKILL_DIR/references/help.md"
   run "$EP" --skill-dir="$SKILL_DIR" -- --help
-  [ "$status" -eq 11 ]
-  [[ "$output" == *"Help page missing"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"infra"'* ]]
+  msg="$(envelope_field "$output" message)"
+  [[ "$msg" == *"Help page missing"* ]]
 }
 
-@test "--help skips the update check (no notice glued to help output)" {
+@test "--help skips the update check (no notice on help envelope)" {
   stub_git
   export MOCK_TAGS="v9.9.9"  # would produce a notice if update-check ran
   run "$EP" --skill-dir="$SKILL_DIR" -- --help
   [ "$status" -eq 0 ]
-  [[ "$output" != *"is available"* ]]
+  [[ "$output" != *'"notice"'* ]]
 }
 
-# ─── update-check preamble ─────────────────────────────────────
+# ─── update-check preamble (via envelope notice field) ─────────
 
-@test "update notice is printed on stdout when a newer tag exists" {
+@test "notice field is attached when a newer tag exists" {
   stub_git
   export MOCK_TAGS="v1.0.0 v2.0.0"
   cat > "$CACHE_FILE" <<EOF
@@ -82,7 +124,9 @@ setup() {
 EOF
   run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
-  [[ "$output" == *"kstack v2.0.0 is available"* ]]
+  [[ "$output" == *'"notice"'* ]]
+  notice="$(envelope_field "$output" notice)"
+  [[ "$notice" == *"kstack v2.0.0 is available"* ]]
 }
 
 @test "no notice when cache shows up-to-date" {
@@ -97,24 +141,25 @@ EOF
 EOF
   run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
-  [ -z "$output" ]
+  [[ "$output" != *'"notice"'* ]]
 }
 
-@test "git ls-remote failure leaves invocation silent (not broken)" {
+@test "git ls-remote failure leaves invocation silent (envelope still valid)" {
   stub_git --fail
   rm -f "$CACHE_FILE"
   run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
-  [ -z "$output" ]
+  [[ "$output" == *'"status":"ok"'* ]]
+  [[ "$output" != *'"notice"'* ]]
 }
 
-@test "no install.conf → silent preamble" {
+@test "no install.conf → silent preamble envelope" {
   rm "$ROOT/install.conf"
   stub_git
   export MOCK_TAGS="v9.0.0"
   run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
-  [ -z "$output" ]
+  [[ "$output" != *'"notice"'* ]]
 }
 
 @test "install.conf=main → silent preamble (pre-release)" {
@@ -123,68 +168,65 @@ EOF
   export MOCK_TAGS="v9.0.0"
   run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
-  [ -z "$output" ]
+  [[ "$output" != *'"notice"'* ]]
 }
 
 # ─── scripts/main dispatch ─────────────────────────────────────
 
-@test "no scripts/main → exit 0 with empty stdout (Claude handles body)" {
+@test "no scripts/main → ok/agent envelope with empty content" {
   stub_git
   export MOCK_TAGS="v1.0.0"
   run "$EP" --skill-dir="$SKILL_DIR" --
   [ "$status" -eq 0 ]
-  [ -z "$output" ]
+  [[ "$output" == *'"render":"agent"'* ]]
+  content="$(envelope_field "$output" content)"
+  [ -z "$content" ]
 }
 
-@test "scripts/main exists and exits 10 → entrypoint exits 10 with main's stdout" {
+@test "scripts/main output is passed through verbatim to stdout" {
   stub_git
   export MOCK_TAGS="v1.0.0"
   cat > "$SKILL_DIR/scripts/main" <<'EOF'
 #!/usr/bin/env bash
-echo "snapshot output"
-exit 10
+printf '{"kstack":"1","status":"ok","render":"verbatim","content":"snapshot output"}\n'
+exit 0
 EOF
   chmod +x "$SKILL_DIR/scripts/main"
   run "$EP" --skill-dir="$SKILL_DIR" --
-  [ "$status" -eq 10 ]
-  [[ "$output" == *"snapshot output"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"content":"snapshot output"'* ]]
 }
 
-@test "scripts/main exit 11 with stderr → entrypoint propagates 11" {
+@test "scripts/main receives KSTACK_NOTICE when one is due" {
   stub_git
-  export MOCK_TAGS="v1.0.0"
+  export MOCK_TAGS="v1.0.0 v2.0.0"
+  cat > "$CACHE_FILE" <<EOF
+{
+  "last_check": "2000-01-01T00:00:00Z",
+  "latest_known": "v1.0.0"
+}
+EOF
   cat > "$SKILL_DIR/scripts/main" <<'EOF'
 #!/usr/bin/env bash
-echo "user-facing error" >&2
-exit 11
+printf 'notice-was=%s\n' "${KSTACK_NOTICE:-<unset>}"
+exit 0
 EOF
   chmod +x "$SKILL_DIR/scripts/main"
   run "$EP" --skill-dir="$SKILL_DIR" --
-  [ "$status" -eq 11 ]
-  [[ "$output" == *"user-facing error"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"notice-was=kstack v2.0.0 is available"* ]]
 }
 
-@test "scripts/main exit 1 → entrypoint propagates 1" {
-  stub_git
-  export MOCK_TAGS="v1.0.0"
-  cat > "$SKILL_DIR/scripts/main" <<'EOF'
-#!/usr/bin/env bash
-echo "boom" >&2
-exit 1
-EOF
-  chmod +x "$SKILL_DIR/scripts/main"
-  run "$EP" --skill-dir="$SKILL_DIR" --
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"boom"* ]]
-}
-
-@test "scripts/main not executable → exit 11" {
+@test "scripts/main non-executable → infra error envelope" {
   stub_git
   export MOCK_TAGS="v1.0.0"
   : > "$SKILL_DIR/scripts/main"  # create but do not chmod +x
   run "$EP" --skill-dir="$SKILL_DIR" --
-  [ "$status" -eq 11 ]
-  [[ "$output" == *"not executable"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"infra"'* ]]
+  msg="$(envelope_field "$output" message)"
+  [[ "$msg" == *"not executable"* ]]
 }
 
 @test "scripts/main sees KSTACK_* env vars + forwarded argv" {
@@ -192,13 +234,13 @@ EOF
 #!/usr/bin/env bash
 printf 'root=%s dir=%s name=%s args=%s\n' \
   "${KSTACK_ROOT:-}" "${KSTACK_SKILL_DIR:-}" "${KSTACK_SKILL_NAME:-}" "$*"
-exit 10
+exit 0
 EOF
   chmod +x "$SKILL_DIR/scripts/main"
   stub_git
   export MOCK_TAGS="v1.0.0"
   run "$EP" --skill-dir="$SKILL_DIR" -- --context=dev foo bar
-  [ "$status" -eq 10 ]
+  [ "$status" -eq 0 ]
   [[ "$output" == *"root=$ROOT"* ]]
   [[ "$output" == *"dir=$SKILL_DIR"* ]]
   [[ "$output" == *"name=demo"* ]]
@@ -207,18 +249,24 @@ EOF
 
 # ─── parser errors ─────────────────────────────────────────────
 
-@test "missing --skill-dir exits 11" {
+@test "missing --skill-dir emits infra error envelope" {
   run "$EP" --
-  [ "$status" -eq 11 ]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"infra"'* ]]
 }
 
-@test "missing '--' separator exits 11" {
+@test "missing '--' separator emits infra error envelope" {
   run "$EP" --skill-dir="$SKILL_DIR"
-  [ "$status" -eq 11 ]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"infra"'* ]]
 }
 
-@test "unexpected flag before '--' exits 11" {
+@test "unexpected flag before '--' emits infra error envelope" {
   run "$EP" --skill-dir="$SKILL_DIR" --bogus -- --help
-  [ "$status" -eq 11 ]
-  [[ "$output" == *"Unexpected flag"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"kind":"infra"'* ]]
+  msg="$(envelope_field "$output" message)"
+  [[ "$msg" == *"Unexpected flag"* ]]
 }

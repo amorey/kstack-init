@@ -135,8 +135,9 @@ render_skill() {
 #
 # Renders a help page for $skill by extracting its <dt>/<dd> block from
 # $readme and appending the global-flags table. Exits non-zero if no
-# matching section is found. The output ends with the literal sentinel
-# "=== END HELP ===" which the skill body uses to detect end-of-help.
+# matching section is found. The entrypoint wraps this file in a
+# `render: verbatim` response envelope on --help, so no in-file sentinel
+# is needed.
 render_help() {
   local skill="$1" readme="$2" out_file="$3"
   mkdir -p "$(dirname "$out_file")"
@@ -165,7 +166,7 @@ render_help() {
         print "render_help: no README section for /" skill > "/dev/stderr"
         exit 2
       }
-      printf "%s\n%s\n=== END HELP ===\n", body, flags
+      printf "%s\n%s", body, flags
     }
   ' "$readme" > "$out_file" || {
     local rc=$?
@@ -253,6 +254,10 @@ sync_dir() {
 # copy_bin $src $dst
 #   Materialize every file in $src/ into $dst/ as an executable helper.
 copy_bin() { sync_dir "$1" '*' "$2" "bin/" 1; }
+
+# copy_schemas $src $dst
+#   Sync *.json schema files (response envelope etc.) into $dst/.
+copy_schemas() { sync_dir "$1" '*.json' "$2" "schemas/" 0; }
 
 # copy_skill_scripts $src $dst
 #   Mirror a skill's scripts/ dir into the rendered slot. Top-level files are
@@ -395,6 +400,7 @@ main() {
 
   copy_bin "$SRC_ROOT/bin" "$ROOT_DIR/bin"
   copy_lib "$SRC_ROOT/lib" "$LIB_DIR"
+  copy_schemas "$SRC_ROOT/schemas" "$ROOT_DIR/schemas"
   log "   📦 Helpers    → $ROOT_DIR"
 
   if [ "$GLOBAL" -eq 1 ]; then

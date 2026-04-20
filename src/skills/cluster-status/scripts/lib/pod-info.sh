@@ -14,83 +14,108 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pod-info.sh — fetch per-pod health/status for /cluster-status.
+# pod-info.sh — render a bounded pod summary + top-issues block for
+# /cluster-status. Sourced, not executed. Outputs:
 #
-# Sourced, not executed. Exposes pod_info::fetch, which takes a context
-# name and prints an aligned table with one row per pod across all
-# namespaces. On failure it writes a diagnostic to stderr and returns
-# non-zero.
+#   Pods   X/Y Ready · N pod(s) with restarts
+#
+#   Issues (K):
+#     <ns>/<name>  <reason>  <detail>
+#     ...               (top 5 by severity)
+#     …and M more       (if > 5)
+#
+# Full per-pod details live in the cached pods.json for follow-up queries.
 
-pod_info::fetch() {
-  local context="$1"
+pod_info::render() {
+  local file="$1"
 
-  local pods_json
-  if ! pods_json="$(kubectl --context="$context" get pods --all-namespaces -o json 2>/dev/null)"; then
-    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
-    printf 'Unable to list pods for context `%s`.\n' "$context" >&2
-    return 1
-  fi
+  # One jq pass emits tagged tab-separated records; shell below parses them.
+  local records
+  records="$(jq -r '
+    # Succeeded pods (completed jobs/cronjobs) are not unhealthy — their
+    # containers report ready=false because they terminated normally. Treat
+    # them as out-of-scope for the Ready/Total count and for Issues.
+    def is_terminal_success: .status.phase == "Succeeded";
 
-  local rows
-  rows="$(printf '%s' "$pods_json" | jq -r '
-    def age($start):
-      ((now - ($start | fromdateiso8601)) / 86400 | floor) as $d
-      | if $d >= 1 then "\($d)d"
-        else ((now - ($start | fromdateiso8601)) / 3600 | floor) as $h
-             | if $h >= 1 then "\($h)h"
-               else ((now - ($start | fromdateiso8601)) / 60 | floor | tostring) + "m"
-               end
-        end;
+    def is_ready:
+      (.status.containerStatuses // []) as $cs
+      | (.spec.containers // []) as $spec
+      | ($cs | length) > 0
+        and ($cs | length) == ($spec | length)
+        and all($cs[]; .ready == true);
 
-    def state_reason($statuses):
-      [ ($statuses // [])[]
-        | (.state // {})
-        | (.waiting.reason // .terminated.reason // null)
+    def waiting_reason:
+      [ (.status.containerStatuses // [])[]
+        | (.state // {}).waiting.reason
+        | select(. != null and . != "")
+      ] | .[0] // null;
+
+    def waiting_message:
+      [ (.status.containerStatuses // [])[]
+        | (.state // {}).waiting.message
         | select(. != null and . != "")
       ] | .[0] // "";
 
-    def phase_or_reason:
-      state_reason(.status.containerStatuses) as $cr
-      | if ($cr != "") then $cr
-        else (.status.reason // .status.phase // "Unknown")
-        end;
+    def reason_or_phase:
+      waiting_reason // .status.reason // .status.phase // "Unknown";
 
-    def ready_count($statuses):
-      ($statuses // []) | map(select(.ready == true)) | length;
+    def total_restarts:
+      (.status.containerStatuses // []) | map(.restartCount // 0) | add // 0;
 
-    def restarts($statuses):
-      ($statuses // []) | map(.restartCount // 0) | add // 0;
+    def sev_rank($r):
+      ["CrashLoopBackOff","ImagePullBackOff","ErrImagePull",
+       "CreateContainerError","CreateContainerConfigError",
+       "InvalidImageName","RunContainerError"]
+      | index($r) // 99;
 
-    def owner:
-      ((.metadata.ownerReferences // []) | .[0].kind // "Pod");
+    ([.items[] | select(is_terminal_success | not)]) as $active
+    | ($active | length) as $total
+    | ([$active[] | select(is_ready)] | length) as $ready
+    | ([$active[] | select(total_restarts > 0)] | length) as $with_restarts
+    | [$active[]
+        | select(is_ready | not)
+        | {
+            pod: "\(.metadata.namespace)/\(.metadata.name)",
+            reason: reason_or_phase,
+            restarts: total_restarts,
+            msg: waiting_message
+          }
+      ] as $issues
+    | ($issues | sort_by(sev_rank(.reason), -(.restarts))) as $ranked
+    | "SUMMARY\t\($ready)/\($total) Ready · \($with_restarts) pod(s) with restarts",
+      "COUNT\t\($issues | length)",
+      ($ranked | .[0:5][]
+        | "ISSUE\t\(.pod)\t\(.reason)\t\(
+            if .restarts > 0 and .msg != "" then "restarts=\(.restarts); \(.msg)"
+            elif .restarts > 0 then "restarts=\(.restarts)"
+            else .msg
+            end
+          )"),
+      (if ($issues | length) > 5 then "MORE\t\(($issues | length) - 5)" else empty end)
+  ' "$file" 2>/dev/null)"
 
-    .items
-    | sort_by(.metadata.namespace, .metadata.name)
-    | .[]
-    | (.status.containerStatuses // []) as $cs
-    | (.spec.containers // []) as $spec
-    | ($spec | length) as $total
-    | [
-        .metadata.namespace,
-        .metadata.name,
-        phase_or_reason,
-        "\(ready_count($cs))/\($total)",
-        (restarts($cs) | tostring),
-        age(.status.startTime // .metadata.creationTimestamp),
-        (.status.qosClass // "-"),
-        owner,
-        (.spec.nodeName // "-")
-      ]
-    | @tsv
-  ')"
-
-  if [ -z "$rows" ]; then
+  if [ -z "$records" ]; then
     printf 'No pods found.\n' >&2
     return 1
   fi
 
-  {
-    printf 'NAMESPACE\tNAME\tSTATUS\tREADY\tRESTARTS\tAGE\tQOS\tOWNER\tNODE\n'
-    printf '%s\n' "$rows"
-  } | column -t -s "$(printf '\t')"
+  local summary="" issue_count=0 issue_more=0 issue_rows=""
+  while IFS=$'\t' read -r tag a b c; do
+    case "$tag" in
+      SUMMARY) summary="$a" ;;
+      COUNT)   issue_count="$a" ;;
+      ISSUE)   issue_rows+="  $a"$'\t'"$b"$'\t'"$c"$'\n' ;;
+      MORE)    issue_more="$a" ;;
+    esac
+  done <<< "$records"
+
+  printf 'Pods   %s\n' "$summary"
+
+  if [ "$issue_count" -gt 0 ]; then
+    printf '\nIssues (%s):\n' "$issue_count"
+    printf '%s' "$issue_rows" | column -t -s "$(printf '\t')"
+    if [ "$issue_more" -gt 0 ]; then
+      printf '  …and %s more\n' "$issue_more"
+    fi
+  fi
 }

@@ -21,12 +21,13 @@ setup() {
   # Build a minimal fake kstack checkout mirroring the real layout: a
   # top-level install script plus src/{lib,bin,skills,...}.
   FAKE_ROOT="$TMPDIR_TEST/kstack"
-  mkdir -p "$FAKE_ROOT/src/bin" "$FAKE_ROOT/src/lib" \
+  mkdir -p "$FAKE_ROOT/src/bin" "$FAKE_ROOT/src/lib" "$FAKE_ROOT/src/schemas" \
            "$FAKE_ROOT/src/skills/demo" "$FAKE_ROOT/src/skills/_partials"
 
   cp "$REPO_ROOT/install" "$FAKE_ROOT/install"
   cp "$SRC_ROOT/lib/agents.sh" "$FAKE_ROOT/src/lib/agents.sh"
   cp "$SRC_ROOT/lib/cache.sh" "$FAKE_ROOT/src/lib/cache.sh"
+  cp "$SRC_ROOT/schemas/response.schema.json" "$FAKE_ROOT/src/schemas/response.schema.json"
   cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/src/skills/demo/SKILL.md.tmpl"
   cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/src/skills/_partials/global-flags.md"
   cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" "$FAKE_ROOT/src/skills/_partials/entrypoint.md"
@@ -195,11 +196,19 @@ EOF
   [ "$status" -eq 0 ]
 }
 
-@test "help.md ends with END HELP sentinel" {
+@test "help.md does not carry the legacy END HELP sentinel" {
   run "$FAKE_ROOT/install" --agent claude --quiet
   [ "$status" -eq 0 ]
-  run tail -n 1 "$FAKE_ROOT/.claude/skills/demo/references/help.md"
-  [[ "$output" == *"=== END HELP ==="* ]]
+  run grep -F "=== END HELP ===" "$FAKE_ROOT/.claude/skills/demo/references/help.md"
+  [ "$status" -ne 0 ]
+}
+
+@test "install copies response schema into ROOT_DIR/schemas" {
+  run "$FAKE_ROOT/install" --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -f "$FAKE_ROOT/.kstack/schemas/response.schema.json" ]
+  run grep -F 'kstack script response envelope' "$FAKE_ROOT/.kstack/schemas/response.schema.json"
+  [ "$status" -eq 0 ]
 }
 
 @test "SKILL.md skill_dir placeholder resolves to rendered slot path" {

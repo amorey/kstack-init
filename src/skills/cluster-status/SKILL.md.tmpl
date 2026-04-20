@@ -9,7 +9,7 @@ description: Health snapshot (pod restarts, node conditions, resource pressure)
 
 ## Purpose
 
-Produce a single dense health snapshot of the cluster covering nodes, pods, workloads, and disruption budgets. Read-only — never mutates cluster state.
+Produce a lean health snapshot of the cluster — cluster identity, one-line node and pod aggregates, and a ranked top-issues list. Read-only; never mutates cluster state. The snapshot is bounded (~10 lines regardless of cluster size) so re-emitting it through the model is cheap; full per-node/per-pod detail stays in the cached JSON for drill-in.
 
 ## Arguments
 
@@ -22,4 +22,32 @@ This skill takes no positional arguments. If the user supplies one, respond with
 
 ## Workflow
 
-The entrypoint dispatches to `{{SKILL_DIR}}/scripts/main`, which owns the full snapshot (kubectl fanout, severity scoring, rendering) and returns finished output on stdout with the appropriate terminal exit code. Do not run additional kubectl calls. Route follow-up questions to `/investigate <kind>/<namespace>/<name>`.
+The entrypoint dispatches to `{{SKILL_DIR}}/scripts/main`, which fetches `kubectl version`, `kubectl get nodes`, and `kubectl get pods -A` (caching the raw JSON to disk per-context) and emits the lean summary below as a `render: verbatim` envelope. Per the entrypoint contract, print the envelope's `content` verbatim and end the turn. The envelope also carries `agent_context` as a compact JSON string: `{"cache_dir":"<dir>","context":"<ctx>"}`. Parse it (don't display it) and remember `cache_dir` for follow-ups.
+
+Output shape:
+
+    Cluster: <ctx> · Kubernetes <version> · <platform>
+
+    Nodes  <R>/<N> Ready · <P> pressure · <U> unschedulable · <CP> control-plane, <W> worker
+    Pods   <R>/<N> Ready · <K> pod(s) with restarts
+
+    Issues (<count>):
+      <ns>/<name>  <reason>  <detail>
+      ...                                      (top 5 by severity)
+      …and <M> more                            (if issues > 5)
+
+    Snapshot cached. Ask to drill in ...
+
+The `Issues (...)` block is omitted when the cluster is clean.
+
+## Follow-ups on the cached snapshot
+
+The summary deliberately omits the per-node and per-pod tables so the initial response stays cheap. When the user asks to see them — or asks any question answerable from the cached JSON — do **not** re-run `/cluster-status`. Instead:
+
+1. Read the JSON files from the `cache_dir` carried on the previous turn's `agent_context` (`cluster.json`, `nodes.json`, `pods.json`).
+2. Use `jq` to answer — render a full table when asked ("show full pod table", "show nodes"), filter by node/namespace/status, or extract the specific field needed.
+3. When rendering a full table, pick sensible default columns (pods: ns, name, phase/reason, ready, restarts, age, node; nodes: name, role, status, age, kubelet, pressure, taints). Align with `column -t`.
+
+If the user asks for something that requires data not in the cache (e.g. events, logs, specific resource YAML), route to the appropriate skill (`/events`, `/logs`, `/investigate <kind>/<ns>/<name>`) rather than widening this skill.
+
+If the user says "refresh" / "fetch again" / "re-check", re-invoke the skill with `--refresh`.

@@ -15,8 +15,9 @@
 # limitations under the License.
 
 # kstack entrypoint — shared preamble invoked as the first tool call of every
-# rendered SKILL.md. Exit-code contract and invocation signature live in
-# src/skills/_partials/entrypoint.md (the canonical reference).
+# rendered SKILL.md. Always exits 0 and writes exactly one response envelope
+# (schemas/response.schema.json) to stdout. The envelope and its agent-side
+# contract are defined in src/skills/_partials/entrypoint.md.
 
 set -u
 
@@ -26,16 +27,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPT_DIR/../lib/cache.sh"
 # shellcheck source=../lib/update-check.sh
 . "$SCRIPT_DIR/../lib/update-check.sh"
+# shellcheck source=../lib/response.sh
+. "$SCRIPT_DIR/../lib/response.sh"
 
-err() { printf '%s\n' "$*" >&2; }
-
-# Fail-tolerant by design: any bug here must stay invisible to the calling skill.
-run_update_check() {
-  (
-    uc_notice "$SCRIPT_DIR"
-    [ -n "${NOTICE:-}" ] && printf '%s\n' "$NOTICE"
-    exit 0
-  ) 2>/dev/null || true
+# Fail-tolerant by design: any bug in the update check must stay invisible to
+# the calling skill. Subshell isolates `set -u` failures; stdout capture lifts
+# the notice into the caller.
+compute_notice() {
+  KSTACK_NOTICE="$(
+    (
+      uc_notice "$SCRIPT_DIR"
+      [ -n "${NOTICE:-}" ] && printf '%s' "$NOTICE"
+    ) 2>/dev/null || true
+  )"
 }
 
 has_help_flag() {
@@ -54,42 +58,43 @@ main() {
       --skill-dir=*)  skill_dir="${1#--skill-dir=}";  shift ;;
       --) saw_sep=1; shift; break ;;
       *)
-        err "Unexpected flag before '--': $1"
-        exit 11 ;;
+        response::infra_error "Unexpected flag before '--': $1. Reinstall kstack."
+        exit 0 ;;
     esac
   done
 
   if [ -z "$skill_dir" ]; then
-    err "--skill-dir is required."
-    exit 11
+    response::infra_error "--skill-dir is required. Reinstall kstack."
+    exit 0
   fi
   if [ "$saw_sep" -eq 0 ]; then
-    err "Missing '--' separator before user args."
-    exit 11
+    response::infra_error "Missing '--' separator before user args. Reinstall kstack."
+    exit 0
   fi
 
   local skill_name
   skill_name="$(basename "$skill_dir")"
 
-  # --help must short-circuit before the update check so the help output
-  # stays clean (no notice prepended to the rendered help page).
+  # --help short-circuits before the update check so the notice is not glued
+  # to the help page.
   if has_help_flag "$@"; then
     local help_file="$skill_dir/references/help.md"
     if [ ! -f "$help_file" ]; then
-      err "Help page missing for /$skill_name. Reinstall kstack."
-      exit 11
+      response::infra_error "Help page missing for /$skill_name. Reinstall kstack."
+      exit 0
     fi
-    cat "$help_file"
+    response::ok_verbatim "$(cat "$help_file")"
     exit 0
   fi
 
-  run_update_check
+  compute_notice
+  export KSTACK_NOTICE
 
   local main_script="$skill_dir/scripts/main"
   if [ -e "$main_script" ]; then
     if [ ! -x "$main_script" ]; then
-      err "Skill /$skill_name main script is not executable: $main_script"
-      exit 11
+      response::infra_error "Skill /$skill_name main script is not executable: $main_script. Reinstall kstack."
+      exit 0
     fi
     resolve_cache_paths "$SCRIPT_DIR"
     export KSTACK_ROOT="$ROOT_DIR"
@@ -98,6 +103,9 @@ main() {
     exec "$main_script" "$@"
   fi
 
+  # No scripts/main — emit a preamble-only envelope so the agent continues
+  # with the SKILL.md body (and surfaces any notice verbatim).
+  response::ok_agent ""
   exit 0
 }
 

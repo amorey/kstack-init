@@ -114,9 +114,9 @@ render_h() {
   grep -F -e "--dry-run" "$HELP"
 }
 
-@test "render_help ends with the END HELP sentinel" {
+@test "render_help does not emit the legacy END HELP sentinel" {
   render_h demo
-  tail -n 1 "$HELP" | grep -F "=== END HELP ==="
+  ! grep -F "=== END HELP ===" "$HELP"
 }
 
 @test "render_help exits non-zero when README has no matching section" {

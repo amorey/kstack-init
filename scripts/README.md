@@ -6,7 +6,7 @@ Wipes repo-local install artifacts (rendered skill directories, `.kstack/`, lega
 
 ## `install.sh`
 
-Curl-pipe bootstrap hosted at `https://www.kubestack.xyz/install.sh`. Resolves the latest tagged release, clones a kstack-owned checkout at `~/.config/kstack/upstream/`, and hands off to the in-repo `install` script.
+Curl-pipe bootstrap hosted at `https://kubestack.xyz/install.sh`. Resolves the latest tagged release, clones a kstack-owned checkout at `~/.config/kstack/upstream/`, and hands off to the in-repo `install` script.
 
 `scripts/install.sh` is the source of truth. A verbatim copy lives in the `kubetail-website` repo's static assets (served at the public URL). **When you edit `scripts/install.sh`, copy the updated file into `kubetail-website` and ship it.** There is no automated sync.
 

@@ -4,11 +4,19 @@ Before doing anything else this turn, run:
 
     {{ROOT_DIR}}/bin/entrypoint --skill-dir={{SKILL_DIR}} -- <user args verbatim>
 
-Then inspect the exit code:
+The script exits 0 and writes a single JSON object (the **kstack response envelope**) to stdout. Parse the envelope and dispatch:
 
-- **0** — If stdout ends with `=== END HELP ===`, the user asked for `--help`: print stdout verbatim (stopping at the sentinel) and end the turn. Do not restate or reformat. Otherwise continue: if stdout is non-empty, prepend it verbatim to your first reply (it is an update notice), then run the rest of this SKILL.md.
-- **10** — Response complete. Print stdout verbatim and end the turn. Do not add commentary.
-- **11** — User-facing error. Print stderr verbatim and end the turn.
-- Any other non-zero — Print stderr, stop. Do not run the skill body.
+- `{"status":"ok","render":"verbatim","content":"…"}` — Response is complete. Print `content` verbatim and end the turn. Do not reformat, summarize, or add commentary.
+- `{"status":"ok","render":"agent","content":"…"}` — Continue. If `content` is non-empty, treat it as tool output (context for your reasoning). Then run the rest of this SKILL.md as usual.
+- `{"status":"error","kind":"user","message":"…"}` — Print `message` verbatim and end the turn. This is a user-fixable error (bad flag, missing arg); do not retry or reinterpret.
+- `{"status":"error","kind":"infra","message":"…"}` — Print `message` verbatim and end the turn. This is an environment/install failure.
+
+If an `agent_context` field is present, read it as additional context for your reasoning and any follow-up turns — but **never** show it to the user. Its format is skill-specific (typically compact JSON); the SKILL.md body documents what to extract.
+
+If a `notice` field is present on any envelope, prepend it verbatim to whatever you emit this turn — above any `content` or `message`. Notices are update banners the operator needs to see.
+
+If stdout is empty or not a JSON object (the entrypoint crashed before emitting an envelope), print stderr and stop.
+
+The envelope schema is at `{{ROOT_DIR}}/schemas/response.schema.json`.
 
 If the user later says "upgrade kstack" / "install the update", run `{{ROOT_DIR}}/bin/upgrade` and report the result (idempotent). If the user says "dismiss" / "hide the notice", run `{{ROOT_DIR}}/bin/dismiss-update` and confirm.

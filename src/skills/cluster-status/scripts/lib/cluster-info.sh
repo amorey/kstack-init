@@ -14,41 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# cluster-info.sh — fetch high-level cluster identity for /cluster-status.
-#
-# Sourced, not executed. Exposes cluster_info::fetch, which takes a context
-# name and prints four "key: value" lines to stdout. On failure it writes a
-# diagnostic to stderr and returns non-zero; the caller decides how to exit.
+# cluster-info.sh — render the one-line cluster identity header for
+# /cluster-status. Sourced, not executed. On failure writes a diagnostic to
+# stderr and returns non-zero.
 
-cluster_info::fetch() {
-  local context="$1"
-
-  local server
-  if ! server="$(kubectl --context="$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null)" || [ -z "$server" ]; then
-    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
-    printf 'Unable to resolve API server address for context `%s`.\n' "$context" >&2
-    return 1
-  fi
-
-  local version_json
-  if ! version_json="$(kubectl --context="$context" version -o json 2>/dev/null)"; then
-    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
-    printf 'Unable to fetch cluster version for context `%s`.\n' "$context" >&2
-    return 1
-  fi
+cluster_info::render() {
+  local context="$1" file="$2"
 
   local k8s_version platform
-  k8s_version="$(printf '%s' "$version_json" | jq -r '.serverVersion.gitVersion // empty')"
-  platform="$(printf '%s' "$version_json" | jq -r '.serverVersion.platform // empty')"
+  k8s_version="$(jq -r '.serverVersion.gitVersion // empty' "$file" 2>/dev/null)"
+  platform="$(jq -r '.serverVersion.platform // empty' "$file" 2>/dev/null)"
 
   if [ -z "$k8s_version" ]; then
-    # shellcheck disable=SC2016  # backticks are literal markdown, not command substitution
-    printf 'Server version missing from `kubectl version` output.\n' >&2
+    printf 'Server version missing from cached cluster.json.\n' >&2
     return 1
   fi
 
-  printf 'Context: %s\n' "$context"
-  printf 'API server: %s\n' "$server"
-  printf 'Kubernetes version: %s\n' "$k8s_version"
-  printf 'Platform: %s\n' "${platform:-unknown}"
+  printf 'Cluster: %s · Kubernetes %s · %s\n' \
+    "$context" "$k8s_version" "${platform:-unknown}"
 }
