@@ -96,7 +96,9 @@ main() {
     exit 0
   fi
   export KSTACK_KUBE_CONTEXT
-  set -- "${KUBE_CONTEXT_RESIDUAL_ARGS[@]}"
+  # Safe expansion: bash 3.2 (macOS default) errors on "${arr[@]}" for an
+  # empty array under set -u. The +alt form expands to nothing when unset.
+  set -- ${KUBE_CONTEXT_RESIDUAL_ARGS[@]+"${KUBE_CONTEXT_RESIDUAL_ARGS[@]}"}
   unset KUBE_CONTEXT_RESIDUAL_ARGS KUBE_CONTEXT_ERROR KUBE_CONTEXT_ERROR_KIND
 
   compute_notice
