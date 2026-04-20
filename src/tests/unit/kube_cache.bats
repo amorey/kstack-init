@@ -209,3 +209,26 @@ exit 7
   # No kubectl call.
   [ ! -s "$KUBECTL_LOG" ]
 }
+
+@test "format_duration: seconds granularity under 1m" {
+  [ "$(kube_cache::format_duration 0)"  = "0s"  ]
+  [ "$(kube_cache::format_duration 1)"  = "1s"  ]
+  [ "$(kube_cache::format_duration 59)" = "59s" ]
+}
+
+@test "format_duration: minutes granularity under 1h" {
+  [ "$(kube_cache::format_duration 60)"   = "1m"  ]
+  [ "$(kube_cache::format_duration 125)"  = "2m"  ]
+  [ "$(kube_cache::format_duration 3599)" = "59m" ]
+}
+
+@test "format_duration: hours granularity under 1d" {
+  [ "$(kube_cache::format_duration 3600)"  = "1h"  ]
+  [ "$(kube_cache::format_duration 7200)"  = "2h"  ]
+  [ "$(kube_cache::format_duration 86399)" = "23h" ]
+}
+
+@test "format_duration: days granularity at/over 1d" {
+  [ "$(kube_cache::format_duration 86400)"  = "1d" ]
+  [ "$(kube_cache::format_duration 259200)" = "3d" ]
+}

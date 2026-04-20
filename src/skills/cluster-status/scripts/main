@@ -81,6 +81,9 @@ main() {
     exit 0
   fi
 
+  local snapshot_start
+  snapshot_start="$(date +%s)"
+
   # Fan the three independent fetches out in parallel — each writes a
   # different cache file via .tmp+mv, and KUBE_CACHE_* vars are read-only
   # after init, so there's no shared state to coordinate.
@@ -120,8 +123,31 @@ main() {
     exit 0
   fi
   content+="$block"
+
+  # Any mtime predating $snapshot_start means that file was reused from
+  # cache rather than re-fetched. Oldest such mtime = staleness ceiling of
+  # the aggregated summary.
+  local now oldest_mt="" mt from_cache=false
+  now="$(date +%s)"
+  for f in cluster.json nodes.json pods.json; do
+    mt="$(_kube_cache::mtime "$KUBE_CACHE_DIR/$f")" || continue
+    [ -n "$mt" ] || continue
+    if [ "$mt" -lt "$snapshot_start" ]; then
+      from_cache=true
+      if [ -z "$oldest_mt" ] || [ "$mt" -lt "$oldest_mt" ]; then
+        oldest_mt="$mt"
+      fi
+    fi
+  done
+
+  local freshness
+  if [ "$from_cache" = "true" ] && [ -n "$oldest_mt" ]; then
+    freshness="Used cached snapshot ($(kube_cache::format_duration "$(( now - oldest_mt ))") old, --refresh to update)."
+  else
+    freshness="Snapshot cached (TTL $ttl)."
+  fi
   # shellcheck disable=SC2016  # backticks render as inline code in markdown
-  content+=$'\n\nSnapshot cached. Ask to drill in — e.g. "show full pod table", "pods on <node>", "which nodes are tainted".'
+  content+=$'\n\n'"$freshness"$' Ask to drill in — e.g. "list nodes", "list pods", "pods on <node>", "which nodes are tainted".'
 
   # agent_context: skill-specific follow-up metadata. Compact JSON so future
   # fields can be added without schema churn. Values are JSON-escaped inline

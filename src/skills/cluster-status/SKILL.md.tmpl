@@ -36,7 +36,8 @@ Output shape:
       ...                                      (top 5 by severity)
       …and <M> more                            (if issues > 5)
 
-    Snapshot cached. Ask to drill in ...
+    Snapshot cached (TTL 15m). Ask to drill in ...                         (when data was just fetched)
+    Used cached snapshot (5m old, --refresh to update). Ask to drill in ...  (when any file came from cache)
 
 The `Issues (...)` block is omitted when the cluster is clean.
 
@@ -45,7 +46,7 @@ The `Issues (...)` block is omitted when the cluster is clean.
 The summary deliberately omits the per-node and per-pod tables so the initial response stays cheap. When the user asks to see them — or asks any question answerable from the cached JSON — do **not** re-run `/cluster-status`. Instead:
 
 1. Read the JSON files from the `cache_dir` carried on the previous turn's `agent_context` (`cluster.json`, `nodes.json`, `pods.json`).
-2. Use `jq` to answer — render a full table when asked ("show full pod table", "show nodes"), filter by node/namespace/status, or extract the specific field needed.
+2. Use `jq` to answer — render a full table when asked ("list pods", "list nodes"), filter by node/namespace/status, or extract the specific field needed. "List" requests always return data in tabular form.
 3. When rendering a full table, pick sensible default columns (pods: ns, name, phase/reason, ready, restarts, age, node; nodes: name, role, status, age, kubelet, pressure, taints). Align with `column -t`.
 
 If the user asks for something that requires data not in the cache (e.g. events, logs, specific resource YAML), route to the appropriate skill (`/events`, `/logs`, `/investigate <kind>/<ns>/<name>`) rather than widening this skill.

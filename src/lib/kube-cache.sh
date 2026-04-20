@@ -195,3 +195,19 @@ kube_cache::ensure_version() {
 kube_cache::path() {
   printf '%s/%s.json\n' "$KUBE_CACHE_DIR" "$1"
 }
+
+# kube_cache::format_duration <seconds>
+#   Format a non-negative integer of seconds as a kubectl-style duration
+#   ("5s", "2m", "3h", "1d"). Single-unit granularity, rounded down.
+kube_cache::format_duration() {
+  local s="$1"
+  if [ "$s" -lt 60 ]; then
+    printf '%ds' "$s"
+  elif [ "$s" -lt 3600 ]; then
+    printf '%dm' "$(( s / 60 ))"
+  elif [ "$s" -lt 86400 ]; then
+    printf '%dh' "$(( s / 3600 ))"
+  else
+    printf '%dd' "$(( s / 86400 ))"
+  fi
+}
