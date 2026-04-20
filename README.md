@@ -15,27 +15,27 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 
 **Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart and efficient way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process container logs remotely at the source before sending it back to Claude for analysis which makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium) which makes Claude more capable.
 
-Once you install kstack you'll have access to these K8s commands inside Claude Code:
+Once you install kstack you'll have access to these skills inside Claude Code:
 
 **Monitoring**
-* `/cluster-status` — Health snapshot (pod restarts, node conditions, resource pressure)
-* `/events` — Recent events, ranked by severity
-* `/watch <resource>` — Background watcher (pings Claude only on state changes)
+* `cluster-status` — Health snapshot (pod restarts, node conditions, resource pressure)
+* `events` — Recent events, ranked by severity
+* `watch <resource>` — Background watcher (pings Claude only on state changes)
 
 **Troubleshooting**
-* `/investigate <resource>` — Root-cause analysis across events, logs, and related resources
-* `/exec <pod>` — Guided shell with diagnostics preloaded; ephemeral debug container for scratch/distroless
-* `/logs` — Fetch container logs with remote grep via [Kubetail](https://github.com/kubetail-org/kubetail)
+* `investigate <resource>` — Root-cause analysis across events, logs, and related resources
+* `exec <pod>` — Guided shell with diagnostics preloaded; ephemeral debug container for scratch/distroless
+* `logs` — Fetch container logs with remote grep via [Kubetail](https://github.com/kubetail-org/kubetail)
 
 **Audits**
-* `/audit-security` — RBAC, pod security posture, privilege tightening
-* `/audit-network` — NetworkPolicy, Service, Ingress, GatewayAPI, DNS and encryption checks
-* `/audit-cost` — Requests vs. usage, over-provisioning, idle capacity
-* `/audit-outdated` — Outdated services, known CVEs, available version bumps
+* `audit-security` — RBAC, pod security posture, privilege tightening
+* `audit-network` — NetworkPolicy, Service, Ingress, GatewayAPI, DNS and encryption checks
+* `audit-cost` — Requests vs. usage, over-provisioning, idle capacity
+* `audit-outdated` — Outdated services, known CVEs, available version bumps
 
 **Miscellaneous**
-* `/cleanup-cluster` — Remove all kstack-owned resources from the cluster (debug containers, pod clones, watcher jobs)
-* `/forget` — Clear kstack's local cache and discard what it learned about your cluster(s)
+* `cleanup-cluster` — Remove all kstack-owned resources from the cluster (debug containers, pod clones, watcher jobs)
+* `forget` — Clear kstack's local cache and discard what it learned about your cluster(s)
 
 Our goal is to bring the power of AI to K8s monitoring in a user-friendly and cost-effective way that keeps you in control. If you notice a bug or have a suggestion please create a GitHub Issue or send us an email (hello@kubetail.com)!
 
@@ -62,15 +62,7 @@ mkdir myproject && cd myproject
 curl -sS https://kubestack.xyz/install.sh | bash -s -- --local
 ```
 
-This drops a self-contained `.kstack/` into the current directory and renders skills into `./.claude/skills/kstack-*/` (plus the equivalent dir for every other agent CLI on your `PATH`). Start your agent from that directory and the skills are discoverable right away:
-
-```console
-───────────────────────────────────
-> /kstack-cluster-status
-───────────────────────────────────
-```
-
-Re-running the bootstrap is safe — it overwrites the existing local install with the latest released version. You can run `--local` from any directory, not just an empty one, to attach kstack to an existing project.
+This drops a self-contained `.kstack/` into the current directory and renders skills into `./.claude/skills/kstack-*/` (plus the equivalent dir for every other agent CLI on your `PATH`). Start your agent from that directory and the skills are discoverable right away. You can run the script in `--local` mode from any directory, not just an empty one, to attach kstack to an existing project.
 
 Kstack uses your local `kubeconfig` file for authentication so it will be able to use your RBAC permissions to perform actions on your behalf. If it runs into permissions problems, it will let you know.
 
