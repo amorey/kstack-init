@@ -63,7 +63,9 @@ require_jq() { command -v jq >/dev/null 2>&1 || skip "jq not available"; }
   require_jq
   in=$'line 1\nline 2\t"quoted"\\slash'
   out="$(response::ok_verbatim "$in")"
-  decoded="$(printf '%s' "$out" | jq -r '.content')"
+  # tr -d '\r': normalize Git Bash / jq text-mode CRLFs (see notice-field
+  # test below for the full explanation).
+  decoded="$(printf '%s' "$out" | jq -r '.content' | tr -d '\r')"
   [ "$decoded" = "$in" ]
 }
 
@@ -125,17 +127,12 @@ require_jq() { command -v jq >/dev/null 2>&1 || skip "jq not available"; }
   require_jq
   export KSTACK_NOTICE=$'line 1\n"line 2"'
   out="$(response::user_error "nope")"
-  actual="$(printf '%s' "$out" | jq -r '.notice')"
-  expected=$'line 1\n"line 2"'
-  if [ "$actual" != "$expected" ]; then
-    echo "--- envelope (out) ---" >&2
-    printf '%s' "$out"      | od -c >&2
-    echo "--- actual (jq -r .notice) ---" >&2
-    printf '%s' "$actual"   | od -c >&2
-    echo "--- expected ---" >&2
-    printf '%s' "$expected" | od -c >&2
-    return 1
-  fi
+  # tr -d '\r': jq on Git Bash (Windows) writes stdout in text mode, so
+  # internal LFs in the decoded value get translated to CRLF. Bash's $()
+  # strips the trailing CRLF pair cleanly but leaves internal CRs, which
+  # would otherwise break multi-line round-trip comparisons. The envelope
+  # itself is byte-perfect — this only normalizes the jq output layer.
+  [ "$(printf '%s' "$out" | jq -r '.notice' | tr -d '\r')" = $'line 1\n"line 2"' ]
 }
 
 @test "ok_verbatim reads from stdin when no arg is given" {

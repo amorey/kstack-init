@@ -30,20 +30,19 @@
 #   Read stdin, emit the body of a JSON string literal (no surrounding quotes).
 #   Handles backslashes, double quotes, newlines, tabs, and carriage returns.
 #   Non-ASCII bytes pass through (valid JSON allows UTF-8 in strings).
-#
-#   Implemented with bash parameter expansion rather than awk because gawk
-#   (shipped in Git Bash on Windows) re-interprets "\n" in printf format
-#   strings as a real newline, corrupting the output. Bash parameter
-#   expansion has uniform semantics across platforms.
 response::_escape() {
-  local s
-  s="$(cat)"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\t'/\\t}"
-  s="${s//$'\r'/\\r}"
-  s="${s//$'\n'/\\n}"
-  printf '%s' "$s"
+  awk '
+    BEGIN { ORS = ""; first = 1 }
+    {
+      gsub(/\\/, "\\\\")
+      gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t")
+      gsub(/\r/, "\\r")
+      if (!first) printf "\\n"
+      first = 0
+      printf "%s", $0
+    }
+  '
 }
 
 # response::_notice_suffix
