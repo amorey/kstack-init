@@ -27,6 +27,8 @@ fi
 
 # shellcheck source=/dev/null
 . "$KSTACK_ROOT/lib/response.sh"
+# shellcheck source=lib/cache-key.sh
+. "$SCRIPT_DIR/lib/cache-key.sh"
 # shellcheck source=lib/cluster-info.sh
 . "$SCRIPT_DIR/lib/cluster-info.sh"
 # shellcheck source=lib/node-info.sh
@@ -43,16 +45,6 @@ parse_ttl_seconds() {
     *d) n="${v%d}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$(( n * 86400 ))" && return 0 ;;
   esac
   return 1
-}
-
-context_sha() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    printf '%s' "$1" | sha256sum | awk '{print substr($1,1,12)}'
-  elif command -v shasum >/dev/null 2>&1; then
-    printf '%s' "$1" | shasum -a 256 | awk '{print substr($1,1,12)}'
-  else
-    printf '%s' "$1" | tr -c 'A-Za-z0-9' _ | cut -c1-40
-  fi
 }
 
 file_mtime() {
@@ -124,7 +116,7 @@ main() {
   fi
 
   local sha dir
-  sha="$(context_sha "$context")"
+  sha="$(cache_key::context_sha "$context")"
   dir="$KSTACK_ROOT/cache/cluster-status/$sha"
   if ! mkdir -p "$dir" 2>/dev/null; then
     response::infra_error "Unable to create cache dir: $dir"
