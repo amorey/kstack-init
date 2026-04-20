@@ -27,8 +27,8 @@ fi
 
 # shellcheck source=/dev/null
 . "$KSTACK_ROOT/lib/response.sh"
-# shellcheck source=lib/cache-key.sh
-. "$SCRIPT_DIR/lib/cache-key.sh"
+# shellcheck source=/dev/null
+. "$KSTACK_ROOT/lib/kube-cache.sh"
 # shellcheck source=lib/cluster-info.sh
 . "$SCRIPT_DIR/lib/cluster-info.sh"
 # shellcheck source=lib/node-info.sh
@@ -36,49 +36,22 @@ fi
 # shellcheck source=lib/pod-info.sh
 . "$SCRIPT_DIR/lib/pod-info.sh"
 
-parse_ttl_seconds() {
-  local v="$1" n=""
-  case "$v" in
-    *s) n="${v%s}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$n" && return 0 ;;
-    *m) n="${v%m}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$(( n * 60 ))" && return 0 ;;
-    *h) n="${v%h}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$(( n * 3600 ))" && return 0 ;;
-    *d) n="${v%d}"; [ -n "$n" ] && [ "$n" -eq "$n" ] 2>/dev/null && printf '%d\n' "$(( n * 86400 ))" && return 0 ;;
-  esac
-  return 1
-}
-
-file_mtime() {
-  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
-}
-
-is_fresh() {
-  local file="$1" ttl="$2" mt now
-  [ -f "$file" ] || return 1
-  mt="$(file_mtime "$file")" || return 1
-  [ -n "$mt" ] || return 1
-  now="$(date +%s)"
-  [ "$(( now - mt ))" -lt "$ttl" ]
-}
-
-# ensure_cache <file> <ttl_secs> <refresh> <fetch_cmd...>
-# Atomic-replaces <file> with stdout of fetch_cmd when stale or refreshed.
-ensure_cache() {
-  local file="$1" ttl="$2" refresh="$3"
-  shift 3
-  if [ "$refresh" != "true" ] && is_fresh "$file" "$ttl"; then
-    return 0
-  fi
-  if ! "$@" > "$file.tmp" 2>/dev/null; then
-    rm -f "$file.tmp"
-    return 1
-  fi
-  mv "$file.tmp" "$file"
+# fetch_or_die <noun> <cmd…>
+#   Run cmd; on failure emit an infra-error envelope referencing <noun> +
+#   the active kubectl context, then exit 0. Kept local to this skill
+#   because the phrasing ("Unable to fetch X for context Y.") is
+#   cluster-status-specific.
+fetch_or_die() {
+  local noun="$1"
+  shift
+  "$@" && return 0
+  # shellcheck disable=SC2016  # backticks render as inline code in markdown
+  response::infra_error "$(printf 'Unable to fetch %s for context `%s`.' "$noun" "$KUBE_CACHE_CONTEXT")"
+  exit 0
 }
 
 main() {
-  local context=""
-  local refresh="false"
-  local ttl="15m"
+  local context="" ttl="15m" refresh="false"
   while [ $# -gt 0 ]; do
     case "$1" in
       --context=*) context="${1#--context=}"; shift ;;
@@ -102,51 +75,19 @@ main() {
     esac
   done
 
-  local ttl_secs
-  if ! ttl_secs="$(parse_ttl_seconds "$ttl")"; then
-    response::user_error "Invalid --ttl value \`$ttl\`. Use durations like 30s, 15m, 2h, 1d."
+  local init_args=(--context="$context" --ttl="$ttl")
+  [ "$refresh" = "true" ] && init_args+=(--refresh)
+  if ! kube_cache::init "${init_args[@]}"; then
+    case "$KUBE_CACHE_ERROR_KIND" in
+      user) response::user_error "$KUBE_CACHE_ERROR" ;;
+      *)    response::infra_error "$KUBE_CACHE_ERROR" ;;
+    esac
     exit 0
   fi
 
-  if [ -z "$context" ]; then
-    if ! context="$(kubectl config current-context 2>/dev/null)" || [ -z "$context" ]; then
-      response::user_error "Unable to determine current context. Set one with kubectl or pass --context."
-      exit 0
-    fi
-  fi
-
-  local sha dir
-  sha="$(cache_key::context_sha "$context")"
-  dir="$KSTACK_ROOT/cache/cluster-status/$sha"
-  if ! mkdir -p "$dir" 2>/dev/null; then
-    response::infra_error "Unable to create cache dir: $dir"
-    exit 0
-  fi
-
-  local cluster_file="$dir/cluster.json"
-  local nodes_file="$dir/nodes.json"
-  local pods_file="$dir/pods.json"
-
-  if ! ensure_cache "$cluster_file" "$ttl_secs" "$refresh" \
-      kubectl --context="$context" version -o json; then
-    # shellcheck disable=SC2016
-    response::infra_error "$(printf 'Unable to fetch cluster version for context `%s`.' "$context")"
-    exit 0
-  fi
-
-  if ! ensure_cache "$nodes_file" "$ttl_secs" "$refresh" \
-      kubectl --context="$context" get nodes -o json; then
-    # shellcheck disable=SC2016
-    response::infra_error "$(printf 'Unable to list nodes for context `%s`.' "$context")"
-    exit 0
-  fi
-
-  if ! ensure_cache "$pods_file" "$ttl_secs" "$refresh" \
-      kubectl --context="$context" get pods --all-namespaces -o json; then
-    # shellcheck disable=SC2016
-    response::infra_error "$(printf 'Unable to list pods for context `%s`.' "$context")"
-    exit 0
-  fi
+  fetch_or_die 'cluster version' kube_cache::ensure_version
+  fetch_or_die 'nodes'           kube_cache::ensure_list nodes
+  fetch_or_die 'pods'            kube_cache::ensure_list pods --all-namespaces
 
   local err_tmp
   err_tmp="$(mktemp 2>/dev/null || echo "/tmp/kstack-cs-err-$$")"
@@ -154,21 +95,21 @@ main() {
   trap "rm -f '$err_tmp'" EXIT
 
   local content block
-  if ! block="$(cluster_info::render "$context" "$cluster_file" 2>"$err_tmp")"; then
+  if ! block="$(cluster_info::render "$KUBE_CACHE_CONTEXT" "$KUBE_CACHE_DIR/cluster.json" 2>"$err_tmp")"; then
     response::infra_error "$(cat "$err_tmp")"
     exit 0
   fi
   content="$block"
   content+=$'\n\n'
 
-  if ! block="$(node_info::render "$nodes_file" 2>"$err_tmp")"; then
+  if ! block="$(node_info::render "$KUBE_CACHE_DIR/nodes.json" 2>"$err_tmp")"; then
     response::infra_error "$(cat "$err_tmp")"
     exit 0
   fi
   content+="$block"
   content+=$'\n'
 
-  if ! block="$(pod_info::render "$pods_file" 2>"$err_tmp")"; then
+  if ! block="$(pod_info::render "$KUBE_CACHE_DIR/pods.json" 2>"$err_tmp")"; then
     response::infra_error "$(cat "$err_tmp")"
     exit 0
   fi
@@ -180,8 +121,8 @@ main() {
   # fields can be added without schema churn. Values are JSON-escaped inline
   # since we only carry short path/identifier strings.
   local ctx_esc dir_esc agent_ctx
-  ctx_esc="$(printf '%s' "$context" | response::_escape)"
-  dir_esc="$(printf '%s' "$dir" | response::_escape)"
+  ctx_esc="$(printf '%s' "$KUBE_CACHE_CONTEXT" | response::_escape)"
+  dir_esc="$(printf '%s' "$KUBE_CACHE_DIR" | response::_escape)"
   agent_ctx="$(printf '{"cache_dir":"%s","context":"%s"}' "$dir_esc" "$ctx_esc")"
 
   response::ok_verbatim "$content" "$agent_ctx"
