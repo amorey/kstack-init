@@ -17,7 +17,7 @@
 setup() {
   load '../test_helper.bash'
   common_setup
-  . "$REPO_ROOT/install"
+  . "$REPO_ROOT/scripts/install"
 
   SKILLS_SRC="$FIXTURES_DIR/skills"
   GF="$SKILLS_SRC/_partials/global-flags.md"

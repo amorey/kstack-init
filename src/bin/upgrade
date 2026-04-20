@@ -16,7 +16,7 @@
 
 # kstack upgrade — re-run install at the latest tag against the maintained
 # upstream checkout bundled with this install. Only the two managed modes
-# (global, local) are supported; dev installs upgrade via `git pull && ./install`
+# (global, local) are supported; dev installs upgrade via `git pull && make install`
 # and will fail here because $ROOT_DIR/upstream/ doesn't exist.
 
 set -eu
@@ -26,12 +26,12 @@ main() {
   ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
   if [ "$ROOT_DIR" = "$HOME/.config/kstack" ]; then
-    exec "$ROOT_DIR/upstream/install" --global "$@"
+    exec "$ROOT_DIR/upstream/scripts/install" --global "$@"
   fi
   # Local install: cd to the project dir so the installer's $PWD-based
   # ROOT_DIR resolution points back here.
   cd "$(dirname "$ROOT_DIR")"
-  exec "$ROOT_DIR/upstream/install" --local "$@"
+  exec "$ROOT_DIR/upstream/scripts/install" --local "$@"
 }
 
 if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then

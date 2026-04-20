@@ -22,7 +22,7 @@
 # Requires bats-core (brew install bats-core, or apt install bats).
 set -eu
 
-SRC_ROOT="$(cd "$(dirname "$0")/../src" && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 RUN_E2E=0
 for arg in "$@"; do
@@ -51,7 +51,7 @@ if ! command -v bats >/dev/null 2>&1; then
   exit 1
 fi
 
-bats "$SRC_ROOT/tests/unit" "$SRC_ROOT/tests/integration"
+bats "$REPO_ROOT/tests/unit" "$REPO_ROOT/tests/integration"
 
 if [ "$RUN_E2E" = "1" ]; then
   exec "$(dirname "$0")/test-e2e.sh"

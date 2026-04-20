@@ -19,10 +19,9 @@
 # Three install modes:
 #
 #   Dev (default, from a git clone) — for contributors hacking on kstack.
-#     Reads sources from $SCRIPT_DIR/src/ and writes outputs next to this
-#     script at <repo>/.kstack/ and <repo>/.<agent>/skills/<skill>/. Lets
-#     a contributor iterate on skills without a separate publish step.
-#     Upgrade via `git pull && ./install`.
+#     Reads sources from <repo>/src/ and writes outputs at <repo>/.kstack/
+#     and <repo>/.<agent>/skills/<skill>/. Lets a contributor iterate on
+#     skills without a separate publish step. Invoked as `make install`.
 #
 #   Local (--local) — for end users who want kstack scoped to one project.
 #     Maintains a kstack-owned checkout at <cwd>/.kstack/upstream/ at the
@@ -41,30 +40,31 @@
 # a fork cannot silently install the fork's contents.
 #
 # Upgrade:
-#     Dev:    `git pull && ./install`
+#     Dev:    `git pull && make install`
 #     Local:  `<cwd>/.kstack/bin/upgrade`
 #     Global: `~/.config/kstack/bin/upgrade`
 #
 # Usage:
-#   ./install                        Dev, auto-detect agents (falls back to claude).
-#   ./install --agent <name>         Limit to one agent.
-#   ./install --local                Local install into $PWD/.kstack.
-#   ./install --global               Global install for auto-detected agents.
-#   ./install -q | --quiet           Suppress log output.
+#   scripts/install                  Dev, auto-detect agents (falls back to claude).
+#   scripts/install --agent <name>   Limit to one agent.
+#   scripts/install --local          Local install into $PWD/.kstack.
+#   scripts/install --global         Global install for auto-detected agents.
+#   scripts/install -q | --quiet     Suppress log output.
+#
+# Contributors normally invoke dev mode via `make install`.
 #
 # Supported agents: claude, codex, opencode, cursor, factory, slate, kiro, hermes
 
 set -eu
 
-# SCRIPT_DIR is the repo root (holds this install script, README.md, and the
-# src/ subdir with skills, lib, bin, etc.). In dev mode it doubles as
-# REPO_ROOT so install outputs (.kstack/, .<agent>/skills/) land next to
-# this script — contributors running their agent from the repo root pick
-# them up.
+# This script lives at <repo>/scripts/install. SCRIPT_DIR is its own dir,
+# REPO_ROOT the repo top. In dev mode, REPO_ROOT is where install outputs
+# (.kstack/, .<agent>/skills/) land.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# shellcheck source=src/lib/agents.sh
-. "$SCRIPT_DIR/src/lib/agents.sh"
+# shellcheck source=../src/lib/agents.sh
+. "$REPO_ROOT/src/lib/agents.sh"
 
 KSTACK_CONFIG_DIR="$HOME/.config/kstack"
 # Override KSTACK_REMOTE_URL for CI and local-clone testing. Leave unset for
@@ -366,7 +366,7 @@ main() {
   # Resolve mode-specific paths. REPO_ROOT is the top of the source checkout
   # (holds README.md and the src/ subdir); SRC_ROOT is the src/ subdir itself.
   # Managed modes (global, local) maintain upstream/ inside ROOT_DIR; dev mode
-  # reads sources directly from $SCRIPT_DIR.
+  # reads sources from the in-repo checkout this script sits in.
   if [ "$GLOBAL" -eq 1 ]; then
     MODE=global
     ROOT_DIR="$KSTACK_CONFIG_DIR"
@@ -377,7 +377,7 @@ main() {
     LABEL="local → $PWD"
   else
     MODE=dev
-    ROOT_DIR="$SCRIPT_DIR/.kstack"
+    ROOT_DIR="$REPO_ROOT/.kstack"
     LABEL="dev"
   fi
 
@@ -385,14 +385,11 @@ main() {
   log "🚀 Installing kstack ($LABEL) ·$(printf ' %s' $TARGET_AGENTS)"
   log ""
 
-  if [ "$MODE" = dev ]; then
-    REPO_ROOT="$SCRIPT_DIR"
-    SRC_ROOT="$SCRIPT_DIR/src"
-  else
+  if [ "$MODE" != dev ]; then
     ensure_src_checkout "$ROOT_DIR/upstream" "$ROOT_DIR"
     REPO_ROOT="$ROOT_DIR/upstream"
-    SRC_ROOT="$REPO_ROOT/src"
   fi
+  SRC_ROOT="$REPO_ROOT/src"
   LIB_DIR="$ROOT_DIR/lib"
 
   SKILLS_SRC="$SRC_ROOT/skills"
@@ -442,7 +439,7 @@ main() {
     case "$MODE" in
       global) skills_dir="$(agent_skills_dir_global "$h")" ;;
       local)  skills_dir="$(agent_skills_dir_local "$PWD" "$h")" ;;
-      dev)    skills_dir="$(agent_skills_dir_local "$SCRIPT_DIR" "$h")" ;;
+      dev)    skills_dir="$(agent_skills_dir_local "$REPO_ROOT" "$h")" ;;
     esac
     install_agent "$h" "$ROOT_DIR" "$skills_dir" "kstack-"
   done
@@ -451,7 +448,7 @@ main() {
   log "✅ kstack installed. Start a session with your agent to use the skills."
   log ""
   if [ "$MODE" = dev ]; then
-    log "   Upgrade:   git pull && ./install"
+    log "   Upgrade:   git pull && make install"
     log "   Uninstall: delete this kstack repo directory."
   else
     log "   Upgrade:   $ROOT_DIR/bin/upgrade"

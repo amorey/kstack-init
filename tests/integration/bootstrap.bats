@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# scripts/install.sh bootstrap: resolves latest tag via GitHub API (curl),
-# then clones (or fetches) the maintained checkout and execs $SRC_DIR/install.
+# scripts/bootstrap.sh: resolves latest tag via GitHub API (curl),
+# then clones (or fetches) the maintained checkout and execs
+# $UPSTREAM_DIR/scripts/install.
 
 setup() {
   load '../test_helper.bash'
@@ -33,11 +34,12 @@ setup() {
     cd "$work"
     "$REAL_GIT" config user.email "test@example.com"
     "$REAL_GIT" config user.name "Test"
-    cat > install <<'EOF'
+    mkdir -p scripts
+    cat > scripts/install <<'EOF'
 #!/usr/bin/env bash
 echo "INSTALL-RAN:$*"
 EOF
-    chmod +x install
+    chmod +x scripts/install
     "$REAL_GIT" add -A
     "$REAL_GIT" commit --quiet -m "init"
     "$REAL_GIT" branch -M main
@@ -71,44 +73,44 @@ exec \"\$REAL_GIT\" \"\${args[@]}\"
 "
 }
 
-@test "scripts/install.sh clones bare repo at resolved tag and execs install" {
-  run "$REPO_ROOT/scripts/install.sh"
+@test "scripts/bootstrap.sh clones bare repo at resolved tag and execs install" {
+  run "$REPO_ROOT/scripts/bootstrap.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--global"* ]]
   [ -d "$HOME/.config/kstack/upstream/.git" ]
 }
 
-@test "scripts/install.sh exits 1 when GitHub API yields no tag" {
+@test "scripts/bootstrap.sh exits 1 when GitHub API yields no tag" {
   write_stub curl 'echo "{}"; exit 0'
-  run "$REPO_ROOT/scripts/install.sh"
+  run "$REPO_ROOT/scripts/bootstrap.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Could not resolve latest kstack release"* ]]
 }
 
-@test "scripts/install.sh updates existing checkout on rerun" {
-  run "$REPO_ROOT/scripts/install.sh"
+@test "scripts/bootstrap.sh updates existing checkout on rerun" {
+  run "$REPO_ROOT/scripts/bootstrap.sh"
   [ "$status" -eq 0 ]
-  run "$REPO_ROOT/scripts/install.sh"
+  run "$REPO_ROOT/scripts/bootstrap.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--global"* ]]
 }
 
-@test "scripts/install.sh --local clones into \$PWD/.kstack/upstream and execs install --local" {
+@test "scripts/bootstrap.sh --local clones into \$PWD/.kstack/upstream and execs install --local" {
   PROJECT="$TMPDIR_TEST/proj"
   mkdir -p "$PROJECT"
   cd "$PROJECT"
-  run "$REPO_ROOT/scripts/install.sh" --local
+  run "$REPO_ROOT/scripts/bootstrap.sh" --local
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--local"* ]]
   [ -d "$PROJECT/.kstack/upstream/.git" ]
   [ ! -d "$HOME/.config/kstack/upstream" ]
 }
 
-@test "scripts/install.sh --local forwards extra args to install" {
+@test "scripts/bootstrap.sh --local forwards extra args to install" {
   PROJECT="$TMPDIR_TEST/proj"
   mkdir -p "$PROJECT"
   cd "$PROJECT"
-  run "$REPO_ROOT/scripts/install.sh" --local --agent claude
+  run "$REPO_ROOT/scripts/bootstrap.sh" --local --agent claude
   [ "$status" -eq 0 ]
   [[ "$output" == *"INSTALL-RAN:--local --agent claude"* ]]
 }

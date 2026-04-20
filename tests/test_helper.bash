@@ -19,11 +19,10 @@
 # Each test's setup() should call common_setup to isolate HOME in a tmpdir.
 
 TEST_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# SRC_ROOT points at src/ — the source tree root that holds lib/, bin/,
-# skills/ etc. REPO_ROOT is the actual repo top, one level up, where the
-# user-facing install script, README.md, and scripts/ live.
-SRC_ROOT="$(cd "$TEST_HELPER_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$SRC_ROOT/.." && pwd)"
+# REPO_ROOT is the repo top, where install/, scripts/, and src/ live.
+# SRC_ROOT points at src/ — the installer payload (lib/, bin/, skills/).
+REPO_ROOT="$(cd "$TEST_HELPER_DIR/.." && pwd)"
+SRC_ROOT="$REPO_ROOT/src"
 FIXTURES_DIR="$TEST_HELPER_DIR/fixtures"
 
 common_setup() {

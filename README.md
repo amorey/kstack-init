@@ -425,7 +425,7 @@ Both helpers prompt before removing. They clear the install root (`~/.config/kst
 
 ## Development
 
-The source tree lives under `src/` (skills, helpers, scripts, tests). The repo root stays deliberately minimal for end users — just `README.md`, the `install` entrypoint, `assets/`, and the usual metadata. If you're hacking on kstack, see `src/CLAUDE.md` for the full contributor guide.
+The installer payload lives under `src/` (skills, helpers, lib, schemas). Dev tooling — tests, scripts, CI — sits at the repo root alongside `install`, `README.md`, and `assets/`. If you're hacking on kstack, see `CLAUDE.md` for the full contributor guide.
 
 Run the test suite with bats-core:
 
@@ -436,7 +436,7 @@ brew install bats-core        # macOS
 ./scripts/test.sh
 ```
 
-Tests live in `src/tests/unit/` (sourced-function tests) and `src/tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every push and PR — see `.github/workflows/ci.yml`.
+Tests live in `tests/unit/` (sourced-function tests) and `tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every push and PR — see `.github/workflows/ci.yml`.
 
 ## Get Involved
 

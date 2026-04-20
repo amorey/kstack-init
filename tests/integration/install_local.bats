@@ -32,8 +32,8 @@ setup() {
     git config user.email "test@example.com"
     git config user.name "Test"
 
-    mkdir -p src/bin src/lib src/skills/demo/scripts src/skills/_partials
-    cp "$REPO_ROOT/install" install
+    mkdir -p scripts src/bin src/lib src/skills/demo/scripts src/skills/_partials
+    cp "$REPO_ROOT/scripts/install" scripts/install
     cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
     cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
@@ -48,7 +48,7 @@ EOF
 #!/usr/bin/env bash
 echo snap
 EOF
-    chmod +x install src/bin/hello src/skills/demo/scripts/snapshot
+    chmod +x scripts/install src/bin/hello src/skills/demo/scripts/snapshot
     git add -A
     git commit --quiet -m "init"
     git branch -M main
@@ -62,7 +62,7 @@ EOF
   PROJECT="$TMPDIR_TEST/proj"
   mkdir -p "$PROJECT"
 
-  RUN_INSTALL="$REPO_ROOT/install"
+  RUN_INSTALL="$REPO_ROOT/scripts/install"
   export KSTACK_REMOTE_URL="$BARE"
 }
 

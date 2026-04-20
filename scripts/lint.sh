@@ -32,9 +32,9 @@ if ! command -v shellcheck >/dev/null 2>&1; then
   exit 1
 fi
 
-# Keep this list in sync with src/CLAUDE.md ("lint" description).
+# Keep this list in sync with CLAUDE.md ("lint" description).
 exec shellcheck --severity=warning --external-sources \
-  install \
+  scripts/install \
   src/bin/check-update src/bin/dismiss-update src/bin/entrypoint src/bin/uninstall src/bin/upgrade \
   src/lib/*.sh scripts/*.sh \
   src/skills/cluster-status/scripts/main \
@@ -43,7 +43,7 @@ exec shellcheck --severity=warning --external-sources \
   src/skills/audit-outdated/scripts/version-skew \
   src/skills/audit-outdated/scripts/deprecated-apis \
   src/skills/audit-outdated/scripts/lib/*.sh \
-  src/tests/test_helper.bash \
-  src/tests/e2e/setup_suite.bash \
-  src/tests/e2e/lib/*.sh \
-  src/tests/evals/lib/*.sh
+  tests/test_helper.bash \
+  tests/e2e/setup_suite.bash \
+  tests/e2e/lib/*.sh \
+  tests/evals/lib/*.sh

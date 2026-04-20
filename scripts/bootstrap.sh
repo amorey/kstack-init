@@ -22,9 +22,9 @@
 #     curl -sS https://kubestack.xyz/install.sh | bash -s -- --local
 #
 # Resolves the latest tagged release of kstack, clones (or updates) a
-# kstack-owned checkout under the chosen root, then hands off to the
-# in-repo `install` wrapper in that checkout. All substantive logic lives
-# in the in-repo install scripts — this bootstrap is just a getter.
+# kstack-owned checkout under the chosen root, then hands off to
+# `scripts/install` inside that checkout. All substantive logic lives
+# in the in-repo installer — this bootstrap is just a getter.
 #
 # Modes:
 #   (default)   Global install. Upstream checkout at
@@ -73,8 +73,8 @@ main() {
 
   # When no mode flag was passed, default to --global (historical behavior).
   case " $* " in
-    *" --global "*|*" --local "*) exec "$UPSTREAM_DIR/install" "$@" ;;
-    *) exec "$UPSTREAM_DIR/install" --global "$@" ;;
+    *" --global "*|*" --local "*) exec "$UPSTREAM_DIR/scripts/install" "$@" ;;
+    *) exec "$UPSTREAM_DIR/scripts/install" --global "$@" ;;
   esac
 }
 
