@@ -13,7 +13,7 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 
 ## Introduction
 
-**Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart and efficient way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process node-level data at the source before sending it back to Claude for analysis which makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium) which makes Claude more capable.
+**Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart and efficient way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process container logs remotely at the source before sending it back to Claude for analysis which makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium) which makes Claude more capable.
 
 Once you install kstack you'll have access to these K8s commands inside Claude Code:
 
@@ -33,7 +33,7 @@ Once you install kstack you'll have access to these K8s commands inside Claude C
 * `/audit-cost` — Requests vs. usage, over-provisioning, idle capacity
 * `/audit-outdated` — Outdated services, known CVEs, available version bumps
 
-**Maintenance**
+**Miscellaneous**
 * `/cleanup-cluster` — Remove all kstack-owned resources from the cluster (debug containers, pod clones, watcher jobs)
 * `/forget` — Clear kstack's local cache and discard what it learned about your cluster(s)
 
@@ -454,6 +454,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines. Rea
 
 ## Notes
 
-* Thank you to Garry Tan's [gstack](https://github.com/garrytan/gstack) for the initial inspiration
+* Inspired by Garry Tan's [gstack](https://github.com/garrytan/gstack)
 
 Made with 🧿 in Istanbul
