@@ -122,7 +122,7 @@ Health snapshot across the entire cluster.
 
 **Options:**
 - `--refresh` — fetch most recent data, bypassing and refreshing the cache (default: `false`)
-- `--ttl <duration>` — only update the cache if older than `<duration>` (default: `5m`)
+- `--ttl <duration>` — only update the cache if older than `<duration>` (default: `15m`)
 
 </dd>
 <dt>

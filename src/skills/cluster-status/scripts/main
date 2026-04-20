@@ -30,7 +30,7 @@ err() { printf '%s\n' "$*" >&2; }
 main() {
   local context=""
   local refresh="false"
-  local ttl="5m"
+  local ttl="15m"
   while [ $# -gt 0 ]; do
     case "$1" in
       --context=*) context="${1#--context=}"; shift ;;
