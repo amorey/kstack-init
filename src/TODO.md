@@ -9,10 +9,10 @@ Overall plan from README-finished to v0.1.0 launch. Grouped by phase; within eac
 ## Foundation
 
 - [x] Scaffold repo layout — `.claude/skills/`, `bin/`, `skills/*/SKILL.md.tmpl`, document placeholder resolution convention
-- [x] Build `install` script with multi-agent support — auto-detect + `--agent <name>` flag per README agent table (codex, opencode, cursor, factory, slate, kiro, hermes); supports repo-local and `--global` modes
+- [x] Build `install` script with multi-agent support — auto-detect + `--agent <name>` flag per README agent table (codex, opencode, cursor, factory, slate, kiro, hermes); supports dev, `--local`, and `--global` modes
 - [x] Build `uninstall` script
 - [x] Shared global flag handling — `--context`, `--namespace`, `--json`, `--dry-run` across every skill
-- [x] Upgrade path — `git pull && ./install` (repo-local); `~/.config/kstack/bin/upgrade` wrapper and `curl | bash` bootstrap at `kubestack.xyz/install.sh` for global installs (tracks latest tag)
+- [x] Upgrade path — `git pull && ./install` (dev); `$ROOT_DIR/bin/upgrade` wrapper for managed (`--local`, `--global`) installs; `curl | bash [-s -- --local]` bootstrap at `kubestack.xyz/install.sh` tracks the latest tag
 - [x] Update notifications — `bin/check-update` runs from skill preamble on each invocation (24h cache, both modes), `bin/dismiss-update` silences per-version, `bin/upgrade` mode-aware; all three agent-invoked, not user-facing
 
 ## Pilot skill + testing

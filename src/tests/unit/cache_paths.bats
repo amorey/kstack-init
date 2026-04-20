@@ -29,7 +29,7 @@ setup() {
   [ "$CACHE_FILE" = "$HOME/.config/kstack/cache/update.json" ]
 }
 
-@test "resolve_cache_paths: repo-local mode points at <repo>/.kstack/cache" {
+@test "resolve_cache_paths: dev/local mode points at <root>/.kstack/cache" {
   resolve_cache_paths "/fake/repo/.kstack/bin"
   [ "$ROOT_DIR" = "/fake/repo/.kstack" ]
   [ "$CACHE_DIR" = "/fake/repo/.kstack/cache" ]

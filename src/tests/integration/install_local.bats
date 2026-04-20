@@ -14,316 +14,148 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# install --local mode: clones a kstack-owned upstream into $PWD/.kstack/
+# and renders skills into $PWD/.<agent>/skills/kstack-<name>/.
+
 setup() {
   load '../test_helper.bash'
   common_setup
 
-  # Build a minimal fake kstack checkout mirroring the real layout: a
-  # top-level install script plus src/{lib,bin,skills,...}.
-  FAKE_ROOT="$TMPDIR_TEST/kstack"
-  mkdir -p "$FAKE_ROOT/src/bin" "$FAKE_ROOT/src/lib" "$FAKE_ROOT/src/schemas" \
-           "$FAKE_ROOT/src/skills/demo" "$FAKE_ROOT/src/skills/_partials"
+  # Build a fake upstream: bare+working repo pair with tag v1.2.3.
+  BARE="$TMPDIR_TEST/kstack.git"
+  WORK="$TMPDIR_TEST/kstack-work"
+  mkdir -p "$BARE" "$WORK"
+  git init --quiet --bare "$BARE"
+  git -c init.defaultBranch=main init --quiet "$WORK"
+  (
+    cd "$WORK"
+    git config user.email "test@example.com"
+    git config user.name "Test"
 
-  cp "$REPO_ROOT/install" "$FAKE_ROOT/install"
-  cp "$SRC_ROOT/lib/agents.sh" "$FAKE_ROOT/src/lib/agents.sh"
-  cp "$SRC_ROOT/lib/cache.sh" "$FAKE_ROOT/src/lib/cache.sh"
-  cp "$SRC_ROOT/schemas/response.schema.json" "$FAKE_ROOT/src/schemas/response.schema.json"
-  cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$FAKE_ROOT/src/skills/demo/SKILL.md.tmpl"
-  cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$FAKE_ROOT/src/skills/_partials/global-flags.md"
-  cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" "$FAKE_ROOT/src/skills/_partials/entrypoint.md"
-  cp "$FIXTURES_DIR/README.md" "$FAKE_ROOT/README.md"
-  cat > "$FAKE_ROOT/src/bin/hello" <<'EOF'
+    mkdir -p src/bin src/lib src/skills/demo/scripts src/skills/_partials
+    cp "$REPO_ROOT/install" install
+    cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
+    cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
+    cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
+    cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
+    cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" src/skills/_partials/entrypoint.md
+    cp "$FIXTURES_DIR/README.md" README.md
+    cat > src/bin/hello <<'EOF'
 #!/usr/bin/env bash
 echo hello
 EOF
-  chmod +x "$FAKE_ROOT/src/bin/hello" "$FAKE_ROOT/install"
-}
-
-@test "install --agent claude renders SKILL.md into .claude/skills/demo" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-}
-
-@test "install --agent claude uses local paths in template output" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  run grep -F "install_root: $FAKE_ROOT/.kstack" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-  [ "$status" -eq 0 ]
-  run grep -F "bin_dir: $FAKE_ROOT/.kstack/bin" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-  [ "$status" -eq 0 ]
-}
-
-@test "install materializes bin/ under .kstack" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -x "$FAKE_ROOT/.kstack/bin/hello" ]
-}
-
-@test "install materializes entrypoint into .kstack/bin with exec bit" {
-  cp "$SRC_ROOT/bin/entrypoint" "$FAKE_ROOT/src/bin/entrypoint"
-  chmod +x "$FAKE_ROOT/src/bin/entrypoint"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -x "$FAKE_ROOT/.kstack/bin/entrypoint" ]
-}
-
-@test "rendered SKILL.md contains the entrypoint invocation" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  run grep -F "$FAKE_ROOT/.kstack/bin/entrypoint" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-  [ "$status" -eq 0 ]
-  run grep -F -- "--skill-dir=$FAKE_ROOT/.claude/skills/demo" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-  [ "$status" -eq 0 ]
-}
-
-@test "install materializes lib/ under .kstack" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -f "$FAKE_ROOT/.kstack/lib/cache.sh" ]
-}
-
-@test "install writes install.conf under .kstack" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -f "$FAKE_ROOT/.kstack/install.conf" ]
-}
-
-@test "install --agent codex writes to .codex/skills/demo" {
-  run "$FAKE_ROOT/install" --agent codex --quiet
-  [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.codex/skills/demo/SKILL.md"
-}
-
-@test "install --agent=opencode writes to .config/opencode/skills" {
-  run "$FAKE_ROOT/install" --agent=opencode --quiet
-  [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.config/opencode/skills/demo/SKILL.md"
-}
-
-@test "install --agent nosuch exits 1 with 'Unknown agent'" {
-  run "$FAKE_ROOT/install" --agent nosuch
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"Unknown agent: nosuch"* ]]
-}
-
-@test "install --agent without value exits 1" {
-  run "$FAKE_ROOT/install" --agent
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"Missing value for --agent"* ]]
-}
-
-@test "install rejects unknown option" {
-  run "$FAKE_ROOT/install" --bogus
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"Unknown option: --bogus"* ]]
-}
-
-@test "install creates .kstack/cache in repo-local mode" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -d "$FAKE_ROOT/.kstack/cache" ]
-}
-
-@test "install with no skills/ directory exits 1" {
-  rm -rf "$FAKE_ROOT/src/skills"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"No skills/ directory"* ]]
-}
-
-@test "install with missing global-flags partial exits 1" {
-  rm "$FAKE_ROOT/src/skills/_partials/global-flags.md"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"missing partial"* ]]
-}
-
-@test "install with no agents auto-detected falls back to claude" {
-  # Empty PATH: no agent CLIs visible.
-  run env PATH="/usr/bin:/bin" "$FAKE_ROOT/install" --quiet
-  [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-}
-
-@test "install --help prints usage and exits 0" {
-  run "$FAKE_ROOT/install" --help
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"kstack install"* ]]
-  [[ "$output" == *"Usage:"* ]]
-}
-
-@test "install replaces stale symlink in skill slot" {
-  mkdir -p "$FAKE_ROOT/.claude/skills"
-  ln -s /nonexistent "$FAKE_ROOT/.claude/skills/demo" 2>/dev/null || skip "symlinks not supported"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ ! -L "$FAKE_ROOT/.claude/skills/demo" ]
-  [ -f "$FAKE_ROOT/.claude/skills/demo/SKILL.md" ]
-}
-
-@test "install replaces stale file blocking skill slot" {
-  mkdir -p "$FAKE_ROOT/.claude/skills"
-  echo "stale" > "$FAKE_ROOT/.claude/skills/demo"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -f "$FAKE_ROOT/.claude/skills/demo/SKILL.md" ]
-}
-
-@test "install renders help.md under references/ alongside SKILL.md" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/references/help.md"
-}
-
-@test "install creates references/ directory next to SKILL.md" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -d "$FAKE_ROOT/.claude/skills/demo/references" ]
-}
-
-@test "help.md contains the README skill body" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  run grep -F "A fixture skill used by tests." "$FAKE_ROOT/.claude/skills/demo/references/help.md"
-  [ "$status" -eq 0 ]
-}
-
-@test "help.md contains the global flags table" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  run grep -F -e "--context <ctx>" "$FAKE_ROOT/.claude/skills/demo/references/help.md"
-  [ "$status" -eq 0 ]
-}
-
-@test "help.md does not carry the legacy END HELP sentinel" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  run grep -F "=== END HELP ===" "$FAKE_ROOT/.claude/skills/demo/references/help.md"
-  [ "$status" -ne 0 ]
-}
-
-@test "install copies response schema into ROOT_DIR/schemas" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -f "$FAKE_ROOT/.kstack/schemas/response.schema.json" ]
-  run grep -F 'kstack script response envelope' "$FAKE_ROOT/.kstack/schemas/response.schema.json"
-  [ "$status" -eq 0 ]
-}
-
-@test "SKILL.md skill_dir placeholder resolves to rendered slot path" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  run grep -F "skill_dir: $FAKE_ROOT/.claude/skills/demo" "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-  [ "$status" -eq 0 ]
-}
-
-@test "install aborts when README has no section for a skill" {
-  rm "$FAKE_ROOT/README.md"
-  : > "$FAKE_ROOT/README.md"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"no README section for /demo"* ]]
-}
-
-@test "install prunes orphan skill slot not backed by a source template" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  mkdir -p "$FAKE_ROOT/.claude/skills/ghost"
-  echo "stale" > "$FAKE_ROOT/.claude/skills/ghost/SKILL.md"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ ! -e "$FAKE_ROOT/.claude/skills/ghost" ]
-  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-}
-
-@test "install logs each pruned skill slot" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  mkdir -p "$FAKE_ROOT/.claude/skills/ghost"
-  echo "stale" > "$FAKE_ROOT/.claude/skills/ghost/SKILL.md"
-  run "$FAKE_ROOT/install" --agent claude
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"pruned: ghost"* ]]
-}
-
-@test "install leaves current skill slot intact on idempotent rerun" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"
-}
-
-@test "install copies skills/<name>/scripts/ into rendered slot as executable" {
-  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts"
-  cat > "$FAKE_ROOT/src/skills/demo/scripts/snapshot" <<'EOF'
+    cat > src/skills/demo/scripts/snapshot <<'EOF'
 #!/usr/bin/env bash
 echo snap
 EOF
-  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
+    chmod +x install src/bin/hello src/skills/demo/scripts/snapshot
+    git add -A
+    git commit --quiet -m "init"
+    git branch -M main
+    git tag v1.2.3
+    git remote add origin "$BARE"
+    git push --quiet origin main
+    git push --quiet origin v1.2.3
+  )
+
+  # PROJECT is the user's project dir — where --local drops .kstack/.
+  PROJECT="$TMPDIR_TEST/proj"
+  mkdir -p "$PROJECT"
+
+  RUN_INSTALL="$REPO_ROOT/install"
+  export KSTACK_REMOTE_URL="$BARE"
 }
 
-@test "install mirrors skills/<name>/scripts/ subdirs (e.g. scripts/lib)" {
-  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts/lib"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  echo "helper() { echo hi; }" > "$FAKE_ROOT/src/skills/demo/scripts/lib/helper.sh"
-  run "$FAKE_ROOT/install" --agent claude --quiet
+@test "install --local clones bare repo into \$PWD/.kstack/upstream at latest tag" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
-  [ -f "$FAKE_ROOT/.claude/skills/demo/scripts/lib/helper.sh" ]
+  [ -d "$PROJECT/.kstack/upstream/.git" ]
+  [ -f "$PROJECT/.kstack/install.conf" ]
+  run cat "$PROJECT/.kstack/install.conf"
+  [ "$output" = "v1.2.3" ]
 }
 
-@test "install rebuilds scripts/ slot when source files are removed" {
-  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts/lib"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  echo "x=1" > "$FAKE_ROOT/src/skills/demo/scripts/lib/helper.sh"
-  run "$FAKE_ROOT/install" --agent claude --quiet
+@test "install --local renders skills into \$PWD/.claude/skills/kstack-<name>" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -d "$FAKE_ROOT/.claude/skills/demo/scripts/lib" ]
-  rm -rf "$FAKE_ROOT/src/skills/demo/scripts/lib"
-  run "$FAKE_ROOT/install" --agent claude --quiet
-  [ "$status" -eq 0 ]
-  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts/lib" ]
-  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
+  assert_file_exists "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  # Bare-name slots are never rendered — every mode uses the kstack- prefix.
+  [ ! -e "$PROJECT/.claude/skills/demo" ]
 }
 
-@test "install omits scripts/ slot when source skill has no scripts dir" {
-  run "$FAKE_ROOT/install" --agent claude --quiet
+@test "install --local substitutes local install root and bin dir into template" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts" ]
+  run grep -F "install_root: $PROJECT/.kstack" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  [ "$status" -eq 0 ]
+  run grep -F "bin_dir: $PROJECT/.kstack/bin" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  [ "$status" -eq 0 ]
 }
 
-@test "install prunes stale scripts/ slot when source dir is removed" {
-  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  run "$FAKE_ROOT/install" --agent claude --quiet
+@test "install --local substitutes SKILL_DIR to the local rendered slot path" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
-  rm -rf "$FAKE_ROOT/src/skills/demo/scripts"
-  run "$FAKE_ROOT/install" --agent claude --quiet
+  run grep -F "skill_dir: $PROJECT/.claude/skills/kstack-demo" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
   [ "$status" -eq 0 ]
-  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts" ]
 }
 
-@test "install prunes orphan scripts when source dir shrinks" {
-  mkdir -p "$FAKE_ROOT/src/skills/demo/scripts"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/snapshot"
-  echo "#!/usr/bin/env bash" > "$FAKE_ROOT/src/skills/demo/scripts/extra"
-  chmod +x "$FAKE_ROOT/src/skills/demo/scripts/snapshot" "$FAKE_ROOT/src/skills/demo/scripts/extra"
-  run "$FAKE_ROOT/install" --agent claude --quiet
+@test "install --local substitutes SKILL_NAME with the kstack- prefix" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/extra" ]
-  rm "$FAKE_ROOT/src/skills/demo/scripts/extra"
-  run "$FAKE_ROOT/install" --agent claude --quiet
+  run grep -F "name: kstack-demo" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
   [ "$status" -eq 0 ]
-  [ -x "$FAKE_ROOT/.claude/skills/demo/scripts/snapshot" ]
-  [ ! -e "$FAKE_ROOT/.claude/skills/demo/scripts/extra" ]
+}
+
+@test "install --local copies skills/<name>/scripts/ into rendered slot" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$PROJECT/.claude/skills/kstack-demo/scripts/snapshot" ]
+}
+
+@test "install --local copies bin/ helpers under \$PWD/.kstack/bin" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -x "$PROJECT/.kstack/bin/hello" ]
+}
+
+@test "install --local copies lib/ under \$PWD/.kstack/lib" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
+  [ "$status" -eq 0 ]
+  [ -f "$PROJECT/.kstack/lib/agents.sh" ]
+  [ -f "$PROJECT/.kstack/lib/cache.sh" ]
+}
+
+@test "install --local re-run updates the existing upstream checkout" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
+  [ "$status" -eq 0 ]
+  run "$RUN_INSTALL" --local --agent claude --quiet
+  [ "$status" -eq 0 ]
+  assert_file_exists "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+}
+
+@test "install --local preserves non-kstack skill slot in the shared skills dir" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --agent claude --quiet
+  [ "$status" -eq 0 ]
+  mkdir -p "$PROJECT/.claude/skills/user-own"
+  echo "mine" > "$PROJECT/.claude/skills/user-own/SKILL.md"
+  run "$RUN_INSTALL" --local --agent claude --quiet
+  [ "$status" -eq 0 ]
+  assert_file_exists "$PROJECT/.claude/skills/user-own/SKILL.md"
+}
+
+@test "install --local and --global are mutually exclusive" {
+  cd "$PROJECT"
+  run "$RUN_INSTALL" --local --global --agent claude --quiet
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"mutually exclusive"* ]]
 }

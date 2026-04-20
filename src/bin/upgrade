@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# kstack upgrade — re-run install against the maintained checkout at the
-# latest tag (global mode), or `git pull && ./install` (repo-local mode).
-# Detects its mode from its own install location.
+# kstack upgrade — re-run install at the latest tag against the maintained
+# upstream checkout bundled with this install. Only the two managed modes
+# (global, local) are supported; dev installs upgrade via `git pull && ./install`
+# and will fail here because $ROOT_DIR/upstream/ doesn't exist.
 
 set -eu
 
@@ -27,12 +28,10 @@ main() {
   if [ "$ROOT_DIR" = "$HOME/.config/kstack" ]; then
     exec "$ROOT_DIR/upstream/install" --global "$@"
   fi
-
-  # Repo-local: ROOT_DIR is <repo>/.kstack; the checked-out source is one level up.
-  REPO_ROOT="$(dirname "$ROOT_DIR")"
-  cd "$REPO_ROOT"
-  git pull --ff-only
-  exec ./install "$@"
+  # Local install: cd to the project dir so the installer's $PWD-based
+  # ROOT_DIR resolution points back here.
+  cd "$(dirname "$ROOT_DIR")"
+  exec "$ROOT_DIR/upstream/install" --local "$@"
 }
 
 if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then

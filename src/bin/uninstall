@@ -14,25 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# kstack uninstall — remove the global kstack install.
+# kstack uninstall — remove a global or local kstack install.
 #
-# This script only handles the global install. The canonical way to invoke
-# it is via the copy bundled at:
+# Detects which install it's bundled in from $SCRIPT_DIR:
 #
-#   ~/.config/kstack/bin/uninstall
+#   Global: ~/.config/kstack/bin/uninstall — removes ~/.config/kstack and
+#           every ~/.<agent>/skills/kstack-*/ slot.
+#   Local:  <project>/.kstack/bin/uninstall — removes <project>/.kstack
+#           and every <project>/.<agent>/skills/<installed-skill>/ slot
+#           (no kstack- prefix; slot names come from the upstream checkout).
 #
-# To remove a repo-local install, just delete the kstack repo directory —
-# the local install renders skills directly into <repo>/.<agent>/skills/
-# and never writes outside the repo.
+# To remove a dev install (contributor layout), just delete the kstack
+# repo directory — the dev install renders skills directly into
+# <repo>/.<agent>/skills/ and never writes outside the repo.
 #
 # Usage:
 #   uninstall              Interactive — prompts before removing.
 #   uninstall --force      Skip the confirmation prompt.
 #   uninstall --agent <n>  Scope to one agent.
-#
-# What gets removed:
-#   ~/.claude/skills/kstack-*/   (and equivalents for every supported agent)
-#   ~/.config/kstack/            (bin helpers + anything else kstack owns)
 #
 # Uses `set -uo pipefail` (no -e) so uninstall never aborts partway.
 set -uo pipefail
@@ -49,12 +48,21 @@ main() {
   fi
 
   local KSTACK_CONFIG_DIR="$HOME/.config/kstack"
+  local ROOT_DIR
+  ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-  if [ "$SCRIPT_DIR" != "$KSTACK_CONFIG_DIR/bin" ]; then
-    echo "This is the global uninstaller — run it from $KSTACK_CONFIG_DIR/bin/" >&2
-    echo "to remove the global install." >&2
+  local MODE PROJECT_DIR=""
+  if [ "$ROOT_DIR" = "$KSTACK_CONFIG_DIR" ]; then
+    MODE=global
+  elif [ -d "$ROOT_DIR/upstream/.git" ]; then
+    MODE=local
+    PROJECT_DIR="$(dirname "$ROOT_DIR")"
+  else
+    echo "This uninstaller must be run from its bundled install location:" >&2
+    echo "  global: $KSTACK_CONFIG_DIR/bin/uninstall" >&2
+    echo "  local:  <project>/.kstack/bin/uninstall" >&2
     echo >&2
-    echo "To remove a repo-local install, just delete the kstack repo directory." >&2
+    echo "To remove a dev install, just delete the kstack repo directory." >&2
     exit 1
   fi
 
@@ -85,17 +93,22 @@ main() {
   fi
 
   # Collect every path that would be removed so preview and deletion iterate
-  # the same list.
+  # the same list. Both modes use the same kstack-* glob — slots are
+  # uniformly prefixed, so this never touches user-authored skills.
   local ENTRIES=() skills_dir h entry
   for h in $TARGET_AGENTS; do
-    skills_dir="$(agent_skills_dir_global "$h")"
+    if [ "$MODE" = global ]; then
+      skills_dir="$(agent_skills_dir_global "$h")"
+    else
+      skills_dir="$(agent_skills_dir_local "$PROJECT_DIR" "$h")"
+    fi
     [ -d "$skills_dir" ] || continue
     for entry in "$skills_dir"/kstack-*; do
       [ -e "$entry" ] || [ -L "$entry" ] || continue
       ENTRIES+=("$entry")
     done
   done
-  [ -d "$KSTACK_CONFIG_DIR" ] && ENTRIES+=("$KSTACK_CONFIG_DIR")
+  [ -d "$ROOT_DIR" ] && ENTRIES+=("$ROOT_DIR")
 
   if [ ${#ENTRIES[@]} -eq 0 ]; then
     echo "Nothing to remove — kstack is not installed."

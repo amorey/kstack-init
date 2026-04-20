@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-It lives at `src/CLAUDE.md` (not the repo root) so end users running `claude` from the repo root — who have installed kstack in repo-local mode — do not pick up these dev-facing instructions. Contributors editing any file under `src/` still get this context because Claude Code walks up from the edited file to find the nearest CLAUDE.md.
+It lives at `src/CLAUDE.md` (not the repo root) so contributors running `claude` from the repo root of a dev-mode install do not pick up these dev-facing instructions at the top level. Contributors editing any file under `src/` still get this context because Claude Code walks up from the edited file to find the nearest CLAUDE.md.
 
 ## What this repo is
 
@@ -25,9 +25,10 @@ All commands and paths below are relative to the repo root.
 - `./scripts/test-e2e.sh` — run the cluster-backed tier against a kind cluster named `kstack-test`. The kind lifecycle lives in `src/tests/e2e/lib/kind-cluster.sh` and is shared with the eval tier; the bats suite hook `src/tests/e2e/setup_suite.bash` is a thin wrapper around it. No prior `kind` state is required. Set `KSTACK_REUSE_CLUSTER=1` during dev loops to keep the cluster alive across runs. Requires `kind`, `kubectl`, and a running Docker daemon.
 - `./scripts/test-evals.sh` — run the eval tier: plants fixtures in the kind cluster, invokes skills via `claude -p`, and scores the responses. Requires `ANTHROPIC_API_KEY`, `claude`, `jq`, and `yq` in addition to the e2e prerequisites. Exits 0 with a skip message when `ANTHROPIC_API_KEY` is unset. Env: `KSTACK_EVAL_MAX_RUNS` (override samples per scenario), `KSTACK_EVAL_BUDGET_USD` (hard cost cap). Flags: `--scenario <id>` to run one, `--include-placeholder` to run the smoke scenario.
 - `bats src/tests/unit/<file>.bats` — run a single test file. Use `bats -f "<name pattern>" …` to run one test.
-- `./install` — render skills into `<repo>/.<agent>/skills/…` for every agent CLI detected on `PATH` (repo-local mode). Reads sources from `src/`, writes outputs next to itself at the repo root.
-- `./install --global` — clone/update `~/.config/kstack/upstream/` at the latest release tag and render into `~/.<agent>/skills/kstack-<skill>/…`. Do **not** use the invoker's checkout as the source in global mode; it always pulls canonical upstream.
-- `./scripts/clean.sh` — remove gitignored install artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
+- `./install` — dev mode. Renders skills into `<repo>/.<agent>/skills/kstack-<name>/…` for every agent CLI detected on `PATH`, reading sources from `src/` and writing outputs next to itself at the repo root.
+- `./install --local` — user-facing local install. Clones/updates `$PWD/.kstack/upstream/` at the latest release tag and renders into `$PWD/.<agent>/skills/kstack-<name>/…`. Driven by the hosted bootstrap (`curl … | bash -s -- --local`); the invoker's checkout is never used as the source.
+- `./install --global` — clone/update `~/.config/kstack/upstream/` at the latest release tag and render into `~/.<agent>/skills/kstack-<name>/…`. Same canonical-upstream rule as `--local`.
+- `./scripts/clean.sh` — remove gitignored dev-mode artifacts (`.claude/`, `.codex/`, `.kstack/`, etc.) so `./install` runs against a clean tree.
 
 CI (`.github/workflows/ci.yml`) runs four jobs. `lint` runs `scripts/lint.sh`, which shellchecks the root `install` script plus everything under `src/bin/` (including `entrypoint`), `src/lib/`, `scripts/`, `src/skills/cluster-status/scripts/{main,lib/*.sh}`, `src/tests/test_helper.bash`, `src/tests/e2e/{setup_suite.bash,lib/*.sh}`, and `src/tests/evals/lib/*.sh` (severity=warning, external-sources on). `.bats` files aren't linted — they need SC2164/SC2314 cleanup first. `bats` runs `scripts/test.sh` on Linux, macOS, and Windows (amd64+arm64) for every PR. `bats-e2e` runs `scripts/test-e2e.sh` on Linux amd64 only (kind cluster required) and is a required status check. `evals` runs `scripts/test-evals.sh` but is `workflow_dispatch`-only — trigger it manually via `gh workflow run ci.yml`.
 
@@ -42,24 +43,25 @@ Skills are authored as `src/skills/<name>/SKILL.md.tmpl`. The repo-root `install
 
 `SKILL.md.tmpl` and the README section are the sources of truth — rendered `SKILL.md` and `references/help.md` files are gitignored and must never be hand-edited. Cross-cutting prose (global flags, update notices, preamble dispatch) belongs in a partial, not duplicated into every skill. A new skill needs both a `SKILL.md.tmpl` and a matching `#### /<skill>` section in `README.md`, or `render_help` will exit non-zero during install.
 
-When a skill body needs to invoke a helper, reference it as `{{ROOT_DIR}}/bin/<tool>` so the absolute path is baked in at render time (this is how the same template works under repo-local and global installs).
+When a skill body needs to invoke a helper, reference it as `{{ROOT_DIR}}/bin/<tool>` so the absolute path is baked in at render time (this is how the same template works across all three install modes).
 
 ### Agent table (src/lib/agents.sh)
 
 `src/lib/agents.sh` is the single source of truth mapping agent name → CLI binary to probe → global skills dir → local skills dir. The root `install` script, `src/bin/uninstall`, and the test suite all source it. When adding a new agent, update this file and the table in `README.md`.
 
-### Two install modes
+### Three install modes
 
-Both modes materialize a symmetric `{{ROOT_DIR}}/{bin,lib,cache}/` layout — the only differences are where `{{ROOT_DIR}}` sits and which skills dir the rendered `SKILL.md` files land in.
+All modes materialize a symmetric `{{ROOT_DIR}}/{bin,lib,cache}/` layout and render slots as `kstack-<name>/`. What varies is where `{{ROOT_DIR}}` sits, whether an `upstream/` checkout lives alongside `bin/`, and which agent skills dir receives the rendered `SKILL.md`.
 
-- **Repo-local** (`./install`): copies `src/bin/` → `<repo>/.kstack/bin/` and `src/lib/` → `<repo>/.kstack/lib/` (recursive — per-skill helper trees at `src/lib/<skill>/` are supported), writes `<repo>/.kstack/install.conf` from `git describe --tags --exact-match HEAD` (or current branch name), and renders skills into `<repo>/.<agent>/skills/<name>/SKILL.md`. `{{ROOT_DIR}}` = `<repo>/.kstack`. Upgrade via `git pull && ./install` or `<repo>/.kstack/bin/upgrade`.
-- **Global** (`./install --global`): maintains `~/.config/kstack/upstream/` at the latest `v*` tag, copies `upstream/src/bin/` → `~/.config/kstack/bin/` and `upstream/src/lib/` → `~/.config/kstack/lib/` (recursive), renders into `~/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `~/.config/kstack`. Upgrade via `~/.config/kstack/bin/upgrade`.
+- **Dev** (`./install` from a clone): copies `src/bin/` → `<repo>/.kstack/bin/` and `src/lib/` → `<repo>/.kstack/lib/` (recursive — per-skill helper trees at `src/lib/<skill>/` are supported), writes `<repo>/.kstack/install.conf` from `git describe --tags --exact-match HEAD` (or current branch name), and renders skills into `<repo>/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `<repo>/.kstack`. No `upstream/` dir. Upgrade via `git pull && ./install` (the `bin/upgrade` helper only handles managed modes).
+- **Local** (`./install --local` or the hosted bootstrap): maintains `$PWD/.kstack/upstream/` at the latest `v*` tag and renders into `$PWD/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `$PWD/.kstack`. Upgrade via `$PWD/.kstack/bin/upgrade`.
+- **Global** (`./install --global`): maintains `~/.config/kstack/upstream/` at the latest `v*` tag and renders into `~/.<agent>/skills/kstack-<name>/SKILL.md`. `{{ROOT_DIR}}` = `~/.config/kstack`. Upgrade via `~/.config/kstack/bin/upgrade`.
 
 The `bin/` helpers (`check-update`, `upgrade`, `uninstall`, `dismiss-update`, `entrypoint`) assume they sit at `{{ROOT_DIR}}/bin/<name>` and derive `ROOT_DIR` as `dirname "$SCRIPT_DIR"`. Running a helper directly from the source tree (`./src/bin/check-update`) without installing first is unsupported — paths resolve to the repo root rather than `.kstack/`. Keep that invariant when adding helpers.
 
 ### Skill entrypoint and `scripts/main` contract
 
-Every rendered `SKILL.md` invokes `{{ROOT_DIR}}/bin/entrypoint --skill-dir={{SKILL_DIR}} -- <user args>` as its first action. The entrypoint derives the skill name from `basename "$skill_dir"` — in global mode that's the `kstack-` prefixed slot name, in repo-local it's the bare skill name, which matches what the user typed as the slash command in both modes. The entrypoint owns three mechanical jobs: a cached update-check (lib: `src/lib/update-check.sh`), `--help` short-circuit (wraps `{{SKILL_DIR}}/references/help.md` in a `render: verbatim` envelope), and optional dispatch to `{{SKILL_DIR}}/scripts/main` when that script exists. The entrypoint is deliberately fail-tolerant: update-check runs in a guarded subshell so its failures never break a skill invocation.
+Every rendered `SKILL.md` invokes `{{ROOT_DIR}}/bin/entrypoint --skill-dir={{SKILL_DIR}} -- <user args>` as its first action. The entrypoint derives the skill name from `basename "$skill_dir"` — always the `kstack-` prefixed slot name, which matches what the user typed as the slash command. The entrypoint owns three mechanical jobs: a cached update-check (lib: `src/lib/update-check.sh`), `--help` short-circuit (wraps `{{SKILL_DIR}}/references/help.md` in a `render: verbatim` envelope), and optional dispatch to `{{SKILL_DIR}}/scripts/main` when that script exists. The entrypoint is deliberately fail-tolerant: update-check runs in a guarded subshell so its failures never break a skill invocation.
 
 **Response envelope contract.** Every kstack script (`bin/entrypoint` and each skill's `scripts/main`) exits 0 on a clean run and writes exactly one JSON object — the *response envelope* — to stdout. The schema lives at `src/schemas/response.schema.json` (installed to `{{ROOT_DIR}}/schemas/response.schema.json`) and helpers for emitting envelopes live in `src/lib/response.sh` (`response::ok_verbatim`, `response::ok_agent`, `response::user_error`, `response::infra_error`). The envelope carries `status` (`ok` | `error`), `render` (`verbatim` | `agent` — for `ok`), `kind` (`user` | `infra` — for `error`), `content`/`message`, and an optional `notice` field the entrypoint populates when an update is due. The agent-side dispatch rules live in `src/skills/_partials/entrypoint.md`. Exiting non-zero is reserved for unexpected crashes — all expected outcomes (success, user error, infra error, `--help`) go through the envelope so the host agent never renders a red "Error" banner for a normal response.
 
@@ -71,7 +73,7 @@ A skill opts into automatic shell dispatch by shipping an executable `scripts/ma
 
 ### Install root layout
 
-An install materializes `{{ROOT_DIR}}/{bin,lib,cache,state,install.conf}` — `~/.config/kstack/...` globally, `<repo>/.kstack/...` repo-locally. `bin/` and `lib/` are copies of the `src/` tree (rerun `./install` to pick up changes). `cache/` holds the update-check cache and is managed by `src/lib/cache.sh` (a single-branch function keyed off `dirname "$SCRIPT_DIR"`). `state/` holds per-context learned state. The `/forget` skill clears the `cache/` and `state/` subtrees; `/cleanup-cluster` clears in-cluster resources (anything labeled `kstack.kubetail.com/owned-by=kstack`).
+An install materializes `{{ROOT_DIR}}/{bin,lib,cache,state,install.conf}` — `~/.config/kstack/...` globally, `$PWD/.kstack/...` for `--local`, `<repo>/.kstack/...` for dev mode. `bin/` and `lib/` are copies of the `src/` tree (rerun `./install` to pick up changes). `cache/` holds the update-check cache and is managed by `src/lib/cache.sh` (a single-branch function keyed off `dirname "$SCRIPT_DIR"`). `state/` holds per-context learned state. The `/forget` skill clears the `cache/` and `state/` subtrees; `/cleanup-cluster` clears in-cluster resources (anything labeled `kstack.kubetail.com/owned-by=kstack`).
 
 ## Tests
 

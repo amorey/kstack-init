@@ -53,21 +53,6 @@ uc_resolve_installed_version() {
   esac
 }
 
-# uc_fork_safety_ok $root_dir — returns 0 if it is safe to hit upstream for this
-# install, 1 if this is a fork clone that should bail. Repo-local installs living
-# next to a non-kubetail-org .git remote are the ones we exclude.
-uc_fork_safety_ok() {
-  local root_dir="$1" repo_root="${1%/.kstack}"
-  [ "$repo_root" = "$root_dir" ] && return 0
-  [ -d "$repo_root/.git" ] || return 0
-  local origin_url
-  origin_url="$(git -C "$repo_root" config --get remote.origin.url 2>/dev/null)"
-  case "$origin_url" in
-    *kubetail-org/kstack.git|*kubetail-org/kstack) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
 # uc_refresh_if_stale $cache_file $remote_url $ttl_secs
 #   Reads $cache_file (via read_cache_fields from cache.sh), refreshes from
 #   upstream tags when stale or latest is unknown, and atomically rewrites the
@@ -112,7 +97,6 @@ uc_notice() {
   resolve_cache_paths "$1"
   uc_resolve_installed_version "$ROOT_DIR"
   [ -z "$INSTALLED" ] && return 0
-  uc_fork_safety_ok "$ROOT_DIR" || return 0
   uc_refresh_if_stale "$CACHE_FILE" "$UC_REMOTE_URL" "$UC_TTL_SECS"
   [ -z "$cache_latest" ] && return 0
   # shellcheck disable=SC2154  # cache_* vars are populated by uc_refresh_if_stale.

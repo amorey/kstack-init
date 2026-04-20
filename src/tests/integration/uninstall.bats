@@ -75,7 +75,7 @@ setup() {
   [ ! -e "$HOME/.config/kstack" ]
 }
 
-@test "uninstall exits 1 when not invoked from ~/.config/kstack/bin" {
+@test "uninstall exits 1 when not bundled into a recognized install root" {
   local elsewhere="$TMPDIR_TEST/elsewhere/bin"
   mkdir -p "$elsewhere" "$TMPDIR_TEST/elsewhere/lib"
   cp "$SRC_ROOT/bin/uninstall" "$elsewhere/uninstall"
@@ -84,7 +84,7 @@ setup() {
 
   run "$elsewhere/uninstall" --force
   [ "$status" -eq 1 ]
-  [[ "$output" == *"global uninstaller"* ]]
+  [[ "$output" == *"bundled install location"* ]]
 }
 
 @test "uninstall rejects unknown option" {
@@ -97,4 +97,28 @@ setup() {
   run "$UNINSTALL" --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"kstack uninstall"* ]]
+}
+
+@test "uninstall --force in local layout removes .kstack and scoped skill slots" {
+  # Stage a fake local install: <project>/.kstack/{bin,lib,upstream/.git,…}.
+  # Mode detection only needs upstream/.git to exist; slot pruning uses the
+  # same kstack-* glob as global mode, so no source enumeration required.
+  PROJECT="$TMPDIR_TEST/proj"
+  ROOT="$PROJECT/.kstack"
+  mkdir -p "$ROOT/bin" "$ROOT/lib" "$ROOT/upstream"
+  git init --quiet "$ROOT/upstream"
+  cp "$SRC_ROOT/bin/uninstall" "$ROOT/bin/uninstall"
+  cp "$SRC_ROOT/lib/agents.sh" "$ROOT/lib/agents.sh"
+  chmod +x "$ROOT/bin/uninstall"
+
+  mkdir -p "$PROJECT/.claude/skills/kstack-demo" "$PROJECT/.claude/skills/user-own"
+  echo "kstack" > "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  echo "mine"   > "$PROJECT/.claude/skills/user-own/SKILL.md"
+
+  run "$ROOT/bin/uninstall" --force
+  [ "$status" -eq 0 ]
+  [ ! -e "$ROOT" ]
+  [ ! -e "$PROJECT/.claude/skills/kstack-demo" ]
+  # User-authored skill in the same dir survives.
+  [ -f "$PROJECT/.claude/skills/user-own/SKILL.md" ]
 }
