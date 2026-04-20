@@ -18,24 +18,24 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 Once you install kstack you'll have access to these skills inside Claude Code:
 
 **Monitoring**
-* `cluster-status` — Health snapshot (pod restarts, node conditions, resource pressure)
-* `events` — Recent events, ranked by severity
-* `watch <resource>` — Background watcher (pings Claude only on state changes)
+* `/cluster-status` — Health snapshot (pod restarts, node conditions, resource pressure)
+* `/events` — Recent events, ranked by severity
+* `/watch <resource>` — Background watcher (pings Claude only on state changes)
 
 **Troubleshooting**
-* `investigate <resource>` — Root-cause analysis across events, logs, and related resources
-* `exec <pod>` — Guided shell with diagnostics preloaded; ephemeral debug container for scratch/distroless
-* `logs` — Fetch container logs with remote grep via [Kubetail](https://github.com/kubetail-org/kubetail)
+* `/investigate <resource>` — Root-cause analysis across events, logs, and related resources
+* `/exec <pod>` — Guided shell with diagnostics preloaded; ephemeral debug container for scratch/distroless
+* `/logs` — Fetch container logs with remote grep via [Kubetail](https://github.com/kubetail-org/kubetail)
 
 **Audits**
-* `audit-security` — RBAC, pod security posture, privilege tightening
-* `audit-network` — NetworkPolicy, Service, Ingress, GatewayAPI, DNS and encryption checks
-* `audit-cost` — Requests vs. usage, over-provisioning, idle capacity
-* `audit-outdated` — Outdated services, known CVEs, available version bumps
+* `/audit-security` — RBAC, pod security posture, privilege tightening
+* `/audit-network` — NetworkPolicy, Service, Ingress, GatewayAPI, DNS and encryption checks
+* `/audit-cost` — Requests vs. usage, over-provisioning, idle capacity
+* `/audit-outdated` — Outdated services, known CVEs, available version bumps
 
 **Miscellaneous**
-* `cleanup-cluster` — Remove all kstack-owned resources from the cluster (debug containers, pod clones, watcher jobs)
-* `forget` — Clear kstack's local cache and discard what it learned about your cluster(s)
+* `/cleanup-cluster` — Remove all kstack-owned resources from the cluster (debug containers, pod clones, watcher jobs)
+* `/forget` — Clear kstack's local cache and discard what it learned about your cluster(s)
 
 Our goal is to bring the power of AI to K8s monitoring in a user-friendly and cost-effective way that keeps you in control. If you notice a bug or have a suggestion please create a GitHub Issue or send us an email (hello@kubetail.com)!
 
