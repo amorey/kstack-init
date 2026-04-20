@@ -47,14 +47,6 @@ To install kstack globally so you can use the skills from inside any project run
 curl -sS https://kubestack.xyz/install.sh | bash
 ```
 
-This bootstrap script installs the kstack skills into your Claude user-level skills directory (e.g. `~/.claude/skills`), prefixing the names with `kstack-`. It also detects other available agents (e.g. Codex, OpenCode) and installs the skills into their skills directories as well. Once installed, the skills are available in any project session:
-
-```console
-───────────────────────────────────
-> /kstack-cluster-status
-───────────────────────────────────
-```
-
 Alternatively, you can install kstack locally so the skills are only available from inside one project directory:
 
 ```console
@@ -62,7 +54,13 @@ mkdir myproject && cd myproject
 curl -sS https://kubestack.xyz/install.sh | bash -s -- --local
 ```
 
-This drops a self-contained `.kstack/` into the current directory and renders skills into `./.claude/skills/kstack-*/` (plus the equivalent dir for every other agent CLI on your `PATH`). Start your agent from that directory and the skills are discoverable right away. You can run the script in `--local` mode from any directory, not just an empty one, to attach kstack to an existing project.
+The bootstrap script installs the kstack skills into your global/local Claude skills directory (e.g. `~/.claude/skills`), prefixing the skill names with `kstack-`. It also detects other available agents (e.g. Codex, OpenCode) and installs the skills into their skills directories as well. Once installed, the skills are available in any project session:
+
+```console
+───────────────────────────────────
+> /kstack-cluster-status
+───────────────────────────────────
+```
 
 Kstack uses your local `kubeconfig` file for authentication so it will be able to use your RBAC permissions to perform actions on your behalf. If it runs into permissions problems, it will let you know.
 

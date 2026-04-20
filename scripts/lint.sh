@@ -39,6 +39,10 @@ exec shellcheck --severity=warning --external-sources \
   src/lib/*.sh scripts/*.sh \
   src/skills/cluster-status/scripts/main \
   src/skills/cluster-status/scripts/lib/*.sh \
+  src/skills/audit-outdated/scripts/main \
+  src/skills/audit-outdated/scripts/version-skew \
+  src/skills/audit-outdated/scripts/deprecated-apis \
+  src/skills/audit-outdated/scripts/lib/*.sh \
   src/tests/test_helper.bash \
   src/tests/e2e/setup_suite.bash \
   src/tests/e2e/lib/*.sh \

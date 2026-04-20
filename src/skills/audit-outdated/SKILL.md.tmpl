@@ -7,4 +7,127 @@ description: Outdated services, known CVEs, available version bumps
 
 {{GLOBAL_FLAGS}}
 
-<!-- Body populated in a later TODO item. -->
+## Purpose
+
+Detect version skew across cluster components and flag deprecated Kubernetes APIs still in use. Read-only; never mutates cluster state. The initial snapshot is bounded (~15 lines) so re-emitting through the model is cheap; full per-node detail stays in the cached JSON for drill-in.
+
+## Arguments
+
+This skill takes no positional arguments, but free-text after the command (e.g. `/audit-outdated look for CVEs`) is allowed — treat it as a follow-up intent hint. Do **not** forward the bare text to `scripts/main` (it only understands flags); strip positional tokens and pass through only `--refresh` / `--ttl`. After the snapshot envelope renders, address the hint using the cached data and the limitations listed below. Only the unknown-flag rule from Global flags applies here (tokens starting with `-`); bare text must not trigger an error.
+
+## Skill flags
+
+- `--refresh` — Fetch most recent data, bypassing and refreshing the cache. Default: `false`.
+- `--ttl <duration>` — Only update the cache if older than this (kubectl-style: `5m`, `1h`, `24h`). Default: `15m`. Ignored when `--refresh` is set.
+
+## Workflow
+
+The entrypoint dispatches to `{{SKILL_DIR}}/scripts/main`, which orchestrates two independent audits against a shared cluster snapshot:
+
+1. **Version skew** — always runs inline. Deterministic, fast, no user input required.
+2. **Deprecated APIs** — has a pluggable backend (`pluto` / `kubent` / `web` / `skip`) that the user picks **once**. The choice is persisted to disk and reused on every subsequent run. See "Deprecated-API backend selection" below.
+
+`main`'s envelope always carries `agent_context` as a compact JSON string — parse it, don't display it:
+
+```
+{
+  "cache_dir": "<dir>",
+  "deprecated_apis": {
+    "status": "ok" | "skipped" | "needs_setup",
+    "backend": "pluto" | "kubent" | "web" | "skip",   // when status=ok or skipped
+    "installed": ["pluto", "web"],                      // when status=needs_setup
+    "stale_preference": "pluto" | null,                 // when status=needs_setup
+    "rerun_script": "deprecated-apis"                   // when status=needs_setup
+  }
+}
+```
+
+Remember `cache_dir` for follow-ups.
+
+### Workflow 1: Version skew
+
+Compares the control plane's `gitVersion` against each node's `kubeletVersion` and cross-references the control plane minor version against the endoflife.date API to report supported/EOL status.
+
+**Data source:** `cluster.json` + `nodes.json` from the cache, plus `https://endoflife.date/api/kubernetes.json`.
+
+**Render type:** always `verbatim` when the whole response is verbatim (cached hot path). On first-run envelopes the block is still pre-formatted — display it as-is even though the overall envelope is `render: agent`.
+
+**Output shape:**
+
+    Version Skew:
+      Control plane  v1.31.2
+      Nodes          v1.31.2 (3/3 match)          ← or "2/3 match, 1 behind"
+      Support        Supported until 2025-10       ← or "End-of-life since 2024-12"
+
+If endoflife.date is unreachable, the Support line reads "unable to fetch" — don't fabricate a date.
+
+### Workflow 2: Deprecated APIs
+
+Detects API versions the cluster still serves that are deprecated or removed at the cluster's Kubernetes minor version. Four backends, user-selectable:
+
+1. **pluto** (`detect-all-in-cluster`) — structured JSON, fastest. Recommended when installed.
+2. **kubent** — structured JSON fallback.
+3. **web** — `curl`s the raw Kubernetes deprecation guide from kubernetes.io and pairs it with `kubectl api-versions`. No tool install required, but makes a network call to a public site.
+4. **skip** — don't run this workflow. Version skew still reports.
+
+**Render type depends on which backend ran:**
+
+- **pluto / kubent / skip → `render: verbatim`.** Pre-formatted — print as-is.
+
+      Deprecated APIs:
+        No deprecated APIs detected (via pluto).     ← or a table of findings
+
+- **web → `render: agent`.** Response contains the raw deprecation guide plus the cluster's active API versions. Cross-reference them and for each active API version the guide flags as removed or deprecated at this cluster's minor version, report:
+
+      Deprecated APIs (N, via kubernetes.io):
+        <api/version>                                    removed in X.Y → <replacement>
+
+  If none match, report: "No deprecated APIs detected (via kubernetes.io)."
+
+## Deprecated-API backend selection
+
+The backend choice is a **one-time setup step**, persisted to disk and honored on every subsequent run. The common case — `main` sees a valid cached choice → runs inline → `render: verbatim` — is single-turn with no prompting.
+
+You only need to act when `agent_context.deprecated_apis.status == "needs_setup"`. This happens on first run, or when the previously-chosen tool has been uninstalled (the envelope carries `stale_preference: "<old>"` in that case).
+
+**On `needs_setup`:**
+
+1. Display the Version Skew block from the response as-is.
+2. Consult `installed[]` to see which backends are actually usable on this machine right now.
+3. Ask the user which backend to use. Guide them:
+   - If `pluto` is installed, recommend it (structured output, fastest).
+   - Else if `kubent` is installed, recommend it.
+   - If only `web` is available, call out that it makes a network call to kubernetes.io and ask permission explicitly before picking it for them.
+   - `skip` is always offered as a way to bypass Workflow 2 entirely.
+   - If `stale_preference` is non-null, mention the old choice in the prompt ("pluto is no longer installed — pick another").
+4. Once the user picks, invoke `{{SKILL_DIR}}/scripts/deprecated-apis --backend=<choice>` via the entrypoint. The script persists the preference automatically. A subsequent `/audit-outdated` run won't re-prompt.
+
+**Scope of the saved preference.** By default, the choice is stored globally — it applies to every cluster the user runs this skill against from this workstation. That's the right default: tool availability is a property of the machine, not the cluster. If the user explicitly says they want a different backend for this specific cluster (e.g. "use web here but keep pluto elsewhere"), pass `--scope=context` to `deprecated-apis` — that writes a per-context override that takes precedence over the global default.
+
+### Re-invocation
+
+Each workflow has a standalone script that the agent can invoke directly through the entrypoint. Use these when the user asks to re-run only one audit, or after they pick a backend:
+
+- `{{SKILL_DIR}}/scripts/version-skew` — accepts `--refresh` / `--ttl`.
+- `{{SKILL_DIR}}/scripts/deprecated-apis --backend=<pluto|kubent|web|skip>` — backend is required; also accepts `--refresh`, `--ttl`, and `--scope=<global|context>` (default `global`).
+
+Both emit the same response envelope shape as `main` (scoped to their one workflow).
+
+## Follow-ups on the cached snapshot
+
+When the user asks to drill into version skew — e.g. "which nodes are behind?" — do **not** re-run `/audit-outdated`. Instead:
+
+1. Read the JSON files from the `cache_dir` carried on the previous turn's `agent_context` (`cluster.json`, `nodes.json`).
+2. Use `jq` to answer — list nodes with their kubelet versions, filter by version mismatch, etc.
+3. When rendering a table, pick sensible columns (name, kubeletVersion, role, age) and align with `column -t`.
+
+If the user says "refresh" / "re-check", re-invoke the skill with `--refresh`.
+
+## Limitations (current version)
+
+This initial implementation covers version skew and deprecated API detection. The following are **not yet available** — do not hallucinate them:
+
+- Container image tag freshness checks
+- CVE scanning (Trivy/Grype integration)
+- Helm chart version checks
+- `--severity`, `--target-version`, `--fix`, `--namespace` flags

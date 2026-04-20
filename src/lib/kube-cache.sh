@@ -17,6 +17,9 @@
 
 # kube-cache.sh — shared kubectl snapshot cache.
 #
+# shellcheck source=hash.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hash.sh"
+#
 # Sourced (not executed) by skills that want to read cluster-wide state from
 # a TTL-bounded on-disk snapshot. /cluster-status and /audit-* share the same
 # per-context cache directory, so running them back-to-back inside the TTL
@@ -44,17 +47,9 @@
 # kubectl failure without touching those globals.
 
 # _kube_cache::context_sha <value>
-#   12-char sha256 prefix of <value>. Falls back to a sanitized 40-char
-#   truncation when neither sha256sum nor shasum is on PATH — keeps the tool
-#   usable in minimal environments at the cost of longer cache-dir names.
+#   Delegates to the shared hash::short_sha utility.
 _kube_cache::context_sha() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    printf '%s' "$1" | sha256sum | awk '{print substr($1,1,12)}'
-  elif command -v shasum >/dev/null 2>&1; then
-    printf '%s' "$1" | shasum -a 256 | awk '{print substr($1,1,12)}'
-  else
-    printf '%s' "$1" | tr -c 'A-Za-z0-9' _ | cut -c1-40
-  fi
+  hash::short_sha "$1"
 }
 
 # _kube_cache::parse_ttl_seconds <duration>
