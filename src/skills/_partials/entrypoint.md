@@ -13,6 +13,8 @@ The script exits 0 and writes a single JSON object (the **kstack response envelo
 
 If an `agent_context` field is present, read it as additional context for your reasoning and any follow-up turns — but **never** show it to the user. Its format is skill-specific (typically compact JSON); the SKILL.md body documents what to extract.
 
+If a `kube_context` field is present, that is the cluster this turn ran against (the entrypoint resolved it via `--context` flag / `$KSTACK_KUBE_CONTEXT` env / `kubectl config current-context`). Treat it as the **pinned** cluster for this session: thread `--context=<value>` into every subsequent kstack skill call so the session stays stable across out-of-band `kubectl config use-context` changes. Drop the pin only when the user explicitly switches clusters (mentions another context name, says "now check staging", "switch to prod", etc.). When the pin drops, any `cache_dir` or similar paths carried on prior `agent_context` blocks are stale — they belonged to the old cluster.
+
 If a `notice` field is present on any envelope, prepend it verbatim to whatever you emit this turn — above any `content` or `message`. Notices are update banners the operator needs to see.
 
 If stdout is empty or not a JSON object (the entrypoint crashed before emitting an envelope), print stderr and stop.

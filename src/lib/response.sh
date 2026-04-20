@@ -54,6 +54,16 @@ response::_notice_suffix() {
   printf ',"notice":"%s"' "$esc"
 }
 
+# response::_kube_context_suffix
+#   Emit ',"kube_context":"<escaped>"' when KSTACK_KUBE_CONTEXT is set, else
+#   nothing.
+response::_kube_context_suffix() {
+  [ -n "${KSTACK_KUBE_CONTEXT:-}" ] || return 0
+  local esc
+  esc="$(printf '%s' "$KSTACK_KUBE_CONTEXT" | response::_escape)"
+  printf ',"kube_context":"%s"' "$esc"
+}
+
 # response::_agent_context_suffix <agent_context>
 #   Emit ',"agent_context":"<escaped>"' when the arg is non-empty, else nothing.
 response::_agent_context_suffix() {
@@ -76,12 +86,13 @@ response::ok_verbatim() {
   else
     content="$(cat)"
   fi
-  local esc notice_s agent_s
+  local esc notice_s agent_s kube_s
   esc="$(printf '%s' "$content" | response::_escape)"
   notice_s="$(response::_notice_suffix)"
   agent_s="$(response::_agent_context_suffix "$agent_context")"
-  printf '{"kstack":"1","status":"ok","render":"verbatim","content":"%s"%s%s}\n' \
-    "$esc" "$agent_s" "$notice_s"
+  kube_s="$(response::_kube_context_suffix)"
+  printf '{"kstack":"1","status":"ok","render":"verbatim","content":"%s"%s%s%s}\n' \
+    "$esc" "$agent_s" "$kube_s" "$notice_s"
 }
 
 # response::ok_agent [<content> [<agent_context>]]
@@ -96,30 +107,33 @@ response::ok_agent() {
   else
     content="$(cat)"
   fi
-  local esc notice_s agent_s
+  local esc notice_s agent_s kube_s
   esc="$(printf '%s' "$content" | response::_escape)"
   notice_s="$(response::_notice_suffix)"
   agent_s="$(response::_agent_context_suffix "$agent_context")"
-  printf '{"kstack":"1","status":"ok","render":"agent","content":"%s"%s%s}\n' \
-    "$esc" "$agent_s" "$notice_s"
+  kube_s="$(response::_kube_context_suffix)"
+  printf '{"kstack":"1","status":"ok","render":"agent","content":"%s"%s%s%s}\n' \
+    "$esc" "$agent_s" "$kube_s" "$notice_s"
 }
 
 # response::user_error <message>
 #   Emit a user-fixable error (bad flag, missing arg, invalid context).
 response::user_error() {
-  local esc suffix
+  local esc notice_s kube_s
   esc="$(printf '%s' "$1" | response::_escape)"
-  suffix="$(response::_notice_suffix)"
-  printf '{"kstack":"1","status":"error","kind":"user","message":"%s"%s}\n' \
-    "$esc" "$suffix"
+  notice_s="$(response::_notice_suffix)"
+  kube_s="$(response::_kube_context_suffix)"
+  printf '{"kstack":"1","status":"error","kind":"user","message":"%s"%s%s}\n' \
+    "$esc" "$kube_s" "$notice_s"
 }
 
 # response::infra_error <message>
 #   Emit an environment/install failure (missing binary, broken cache, etc.).
 response::infra_error() {
-  local esc suffix
+  local esc notice_s kube_s
   esc="$(printf '%s' "$1" | response::_escape)"
-  suffix="$(response::_notice_suffix)"
-  printf '{"kstack":"1","status":"error","kind":"infra","message":"%s"%s}\n' \
-    "$esc" "$suffix"
+  notice_s="$(response::_notice_suffix)"
+  kube_s="$(response::_kube_context_suffix)"
+  printf '{"kstack":"1","status":"error","kind":"infra","message":"%s"%s%s}\n' \
+    "$esc" "$kube_s" "$notice_s"
 }

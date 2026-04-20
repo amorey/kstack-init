@@ -29,6 +29,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$SCRIPT_DIR/../lib/update-check.sh"
 # shellcheck source=../lib/response.sh
 . "$SCRIPT_DIR/../lib/response.sh"
+# shellcheck source=../lib/kube-context.sh
+. "$SCRIPT_DIR/../lib/kube-context.sh"
 
 # Fail-tolerant by design: any bug in the update check must stay invisible to
 # the calling skill. Subshell isolates `set -u` failures; stdout capture lifts
@@ -76,7 +78,9 @@ main() {
   skill_name="$(basename "$skill_dir")"
 
   # --help short-circuits before the update check so the notice is not glued
-  # to the help page.
+  # to the help page. No kube context is resolved either — help pages are
+  # cluster-agnostic and resolution would otherwise fail in environments
+  # without kubectl.
   if has_help_flag "$@"; then
     local help_file="$skill_dir/references/help.md"
     if [ ! -f "$help_file" ]; then
@@ -86,6 +90,14 @@ main() {
     response::ok_verbatim "$(cat "$help_file")"
     exit 0
   fi
+
+  if ! kube_context::resolve "$@"; then
+    response::user_error "$KUBE_CONTEXT_ERROR"
+    exit 0
+  fi
+  export KSTACK_KUBE_CONTEXT
+  set -- "${KUBE_CONTEXT_RESIDUAL_ARGS[@]}"
+  unset KUBE_CONTEXT_RESIDUAL_ARGS KUBE_CONTEXT_ERROR KUBE_CONTEXT_ERROR_KIND
 
   compute_notice
   export KSTACK_NOTICE

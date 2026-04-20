@@ -31,16 +31,17 @@
 #
 # Usage:
 #   . "$KSTACK_ROOT/lib/kube-cache.sh"
-#   if ! kube_cache::init --context="$ctx" --ttl=15m; then
+#   if ! kube_cache::init --ttl=15m; then
 #     response::"${KUBE_CACHE_ERROR_KIND}_error" "$KUBE_CACHE_ERROR"; exit 0
 #   fi
 #   kube_cache::ensure_version            || response::infra_error "…"
 #   kube_cache::ensure_list nodes         || response::infra_error "…"
 #   kube_cache::ensure_list pods --all-namespaces
 #
-# Requires $KSTACK_ROOT. init sets KUBE_CACHE_ERROR + KUBE_CACHE_ERROR_KIND
-# (user|infra) on failure; ensure_* return non-zero on kubectl failure
-# without touching those globals.
+# Requires $KSTACK_ROOT and $KSTACK_KUBE_CONTEXT (both set by bin/entrypoint
+# before dispatching to scripts/main). init sets KUBE_CACHE_ERROR +
+# KUBE_CACHE_ERROR_KIND (user|infra) on failure; ensure_* return non-zero on
+# kubectl failure without touching those globals.
 
 # _kube_cache::context_sha <value>
 #   12-char sha256 prefix of <value>. Falls back to a sanitized 40-char
@@ -106,17 +107,16 @@ _kube_cache::ensure_file() {
   mv "$file.tmp" "$file" || { rm -f "$file.tmp"; return 1; }
 }
 
-# kube_cache::init [--context=<name>] [--ttl=<duration>] [--refresh]
-#   Resolve context (empty/missing → `kubectl config current-context`),
-#   parse ttl, create $KSTACK_ROOT/cache/kube/<sha>/, and populate the
+# kube_cache::init [--ttl=<duration>] [--refresh]
+#   Parse ttl, create $KSTACK_ROOT/cache/kube/<sha>/, and populate the
 #   following vars in caller scope:
-#     KUBE_CACHE_CONTEXT     - resolved kubectl context
+#     KUBE_CACHE_CONTEXT     - resolved kubectl context (from $KSTACK_KUBE_CONTEXT)
 #     KUBE_CACHE_DIR         - absolute path to the cache dir
 #     KUBE_CACHE_TTL_SECS    - integer seconds (0 = always refetch)
 #   On failure: returns 1 and populates
 #     KUBE_CACHE_ERROR       - human-readable message
-#     KUBE_CACHE_ERROR_KIND  - "user" (bad flags / no context) or "infra"
-#                              (missing KSTACK_ROOT, mkdir failed).
+#     KUBE_CACHE_ERROR_KIND  - "user" (bad ttl) or "infra" (missing KSTACK_ROOT
+#                              or KSTACK_KUBE_CONTEXT, mkdir failed).
 #   Callers dispatch with: response::"${KUBE_CACHE_ERROR_KIND}_error" "$KUBE_CACHE_ERROR"
 #   --refresh is a user-visible synonym for --ttl=0s.
 kube_cache::init() {
@@ -129,7 +129,6 @@ kube_cache::init() {
   local ttl="15m" refresh=0
   while [ $# -gt 0 ]; do
     case "$1" in
-      --context=*) KUBE_CACHE_CONTEXT="${1#--context=}" ;;
       --ttl=*)     ttl="${1#--ttl=}" ;;
       --refresh)   refresh=1 ;;
       *) KUBE_CACHE_ERROR="kube_cache::init: unknown arg \`$1\`"
@@ -140,14 +139,12 @@ kube_cache::init() {
   done
   [ "$refresh" = 1 ] && ttl=0s
 
-  if [ -z "$KUBE_CACHE_CONTEXT" ]; then
-    if ! KUBE_CACHE_CONTEXT="$(kubectl config current-context 2>/dev/null)" \
-        || [ -z "$KUBE_CACHE_CONTEXT" ]; then
-      KUBE_CACHE_ERROR="Unable to determine current context. Set one with kubectl or pass --context."
-      KUBE_CACHE_ERROR_KIND=user
-      return 1
-    fi
+  if [ -z "${KSTACK_KUBE_CONTEXT:-}" ]; then
+    KUBE_CACHE_ERROR="KSTACK_KUBE_CONTEXT not set; source kube-cache.sh from a skill that runs via bin/entrypoint."
+    KUBE_CACHE_ERROR_KIND=infra
+    return 1
   fi
+  KUBE_CACHE_CONTEXT="$KSTACK_KUBE_CONTEXT"
 
   if ! KUBE_CACHE_TTL_SECS="$(_kube_cache::parse_ttl_seconds "$ttl")"; then
     KUBE_CACHE_ERROR="Invalid --ttl value \`$ttl\`. Use durations like 30s, 15m, 2h, 1d."

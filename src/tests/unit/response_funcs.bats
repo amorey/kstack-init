@@ -24,6 +24,7 @@ setup() {
   # shellcheck source=../../lib/response.sh
   . "$SRC_ROOT/lib/response.sh"
   unset KSTACK_NOTICE
+  unset KSTACK_KUBE_CONTEXT
 }
 
 # jq is a hard dep for kstack skills (cluster-status uses it heavily).
@@ -139,4 +140,64 @@ require_jq() { command -v jq >/dev/null 2>&1 || skip "jq not available"; }
   require_jq
   out="$(printf 'from stdin' | response::ok_verbatim)"
   [ "$(printf '%s' "$out" | jq -r '.content')" = "from stdin" ]
+}
+
+# ─── kube_context auto-injection ───────────────────────────────
+
+@test "kube_context field is attached when KSTACK_KUBE_CONTEXT is set" {
+  require_jq
+  export KSTACK_KUBE_CONTEXT="prod-cluster"
+  out="$(response::ok_verbatim "payload")"
+  [ "$(printf '%s' "$out" | jq -r '.kube_context')" = "prod-cluster" ]
+}
+
+@test "kube_context absent when KSTACK_KUBE_CONTEXT is unset" {
+  require_jq
+  out="$(response::ok_verbatim "payload")"
+  [ "$(printf '%s' "$out" | jq -r 'has("kube_context")')" = "false" ]
+}
+
+@test "kube_context absent when KSTACK_KUBE_CONTEXT is empty" {
+  require_jq
+  export KSTACK_KUBE_CONTEXT=""
+  out="$(response::ok_verbatim "payload")"
+  [ "$(printf '%s' "$out" | jq -r 'has("kube_context")')" = "false" ]
+}
+
+@test "kube_context attached to ok_agent envelopes" {
+  require_jq
+  export KSTACK_KUBE_CONTEXT="staging"
+  out="$(response::ok_agent "")"
+  [ "$(printf '%s' "$out" | jq -r '.kube_context')" = "staging" ]
+}
+
+@test "kube_context attached to user_error envelopes" {
+  require_jq
+  export KSTACK_KUBE_CONTEXT="dev"
+  out="$(response::user_error "bad")"
+  [ "$(printf '%s' "$out" | jq -r '.kube_context')" = "dev"  ]
+}
+
+@test "kube_context attached to infra_error envelopes" {
+  require_jq
+  export KSTACK_KUBE_CONTEXT="dev"
+  out="$(response::infra_error "kubectl down")"
+  [ "$(printf '%s' "$out" | jq -r '.kube_context')" = "dev"  ]
+}
+
+@test "kube_context JSON-escaped for special chars" {
+  require_jq
+  export KSTACK_KUBE_CONTEXT='ctx"with\quotes'
+  out="$(response::ok_verbatim "x")"
+  [ "$(printf '%s' "$out" | jq -r '.kube_context')" = 'ctx"with\quotes' ]
+}
+
+@test "kube_context coexists with notice and agent_context" {
+  require_jq
+  export KSTACK_KUBE_CONTEXT="prod"
+  export KSTACK_NOTICE="update available"
+  out="$(response::ok_verbatim "visible" '{"cache_dir":"/tmp/x"}')"
+  [ "$(printf '%s' "$out" | jq -r '.kube_context')"  = "prod" ]
+  [ "$(printf '%s' "$out" | jq -r '.notice')"        = "update available" ]
+  [ "$(printf '%s' "$out" | jq -r '.agent_context')" = '{"cache_dir":"/tmp/x"}' ]
 }

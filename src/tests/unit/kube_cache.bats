@@ -23,13 +23,13 @@ setup() {
   common_setup
   export KSTACK_ROOT="$TMPDIR_TEST/kstack"
   mkdir -p "$KSTACK_ROOT/lib"
+  export KSTACK_KUBE_CONTEXT="test-ctx"
   # shellcheck source=../../lib/kube-cache.sh
   . "$SRC_ROOT/lib/kube-cache.sh"
 }
 
 # _stub_kubectl emits a stub kubectl that logs every invocation to
 # $KUBECTL_LOG and responds to:
-#   `config current-context` → $MOCK_CONTEXT (default "test-ctx")
 #   `… version …`            → {"serverVersion":{"gitVersion":"v1.30.0"}}
 #   `… get <resource> …`     → {"kind":"List","resource":"<resource>"}
 _stub_kubectl() {
@@ -40,7 +40,6 @@ _stub_kubectl() {
 echo \"\$@\" >> '$KUBECTL_LOG'
 args=\"\$*\"
 case \"\$args\" in
-  *'config current-context'*) printf '%s\n' \"\${MOCK_CONTEXT:-test-ctx}\" ;;
   *version*) printf '{\"serverVersion\":{\"gitVersion\":\"v1.30.0\"}}\n' ;;
   *) r=\"\${args#*get }\"; r=\"\${r%% *}\"
      printf '{\"kind\":\"List\",\"resource\":\"%s\"}\n' \"\$r\" ;;
@@ -48,107 +47,104 @@ esac
 "
 }
 
-@test "init: resolves current context when --context is empty" {
+@test "init: uses \$KSTACK_KUBE_CONTEXT" {
   _stub_kubectl
-  export MOCK_CONTEXT="my-ctx"
+  export KSTACK_KUBE_CONTEXT="my-ctx"
   kube_cache::init
   [ "$KUBE_CACHE_CONTEXT" = "my-ctx" ]
   [ -d "$KUBE_CACHE_DIR" ]
   [ "$KUBE_CACHE_TTL_SECS" = "900" ]  # 15m default
 }
 
-@test "init: honors explicit --context" {
-  _stub_kubectl
-  kube_cache::init --context=other-ctx
-  [ "$KUBE_CACHE_CONTEXT" = "other-ctx" ]
-}
-
 @test "init: parses --ttl=30s" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=30s
+  kube_cache::init --ttl=30s
   [ "$KUBE_CACHE_TTL_SECS" = "30" ]
 }
 
 @test "init: parses --ttl=2h" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=2h
+  kube_cache::init --ttl=2h
   [ "$KUBE_CACHE_TTL_SECS" = "7200" ]
 }
 
 @test "init: parses --ttl=1d" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=1d
+  kube_cache::init --ttl=1d
   [ "$KUBE_CACHE_TTL_SECS" = "86400" ]
 }
 
 @test "init: --ttl=0s is accepted (force-refetch sentinel)" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=0s
+  kube_cache::init --ttl=0s
   [ "$KUBE_CACHE_TTL_SECS" = "0" ]
 }
 
 @test "init: --refresh forces TTL_SECS=0" {
   _stub_kubectl
-  kube_cache::init --context=ctx --refresh
+  kube_cache::init --refresh
   [ "$KUBE_CACHE_TTL_SECS" = "0" ]
 }
 
 @test "init: --refresh overrides an explicit --ttl" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=1h --refresh
+  kube_cache::init --ttl=1h --refresh
   [ "$KUBE_CACHE_TTL_SECS" = "0" ]
 }
 
 @test "init: rejects malformed --ttl with user-kind error" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=bogus || true
+  kube_cache::init --ttl=bogus || true
   [ "$KUBE_CACHE_ERROR_KIND" = "user" ]
   [[ "$KUBE_CACHE_ERROR" == *"Invalid --ttl"* ]]
 }
 
 @test "init: rejects unknown arg with user-kind error" {
   _stub_kubectl
-  kube_cache::init --context=ctx --not-a-flag || true
+  kube_cache::init --not-a-flag || true
   [ "$KUBE_CACHE_ERROR_KIND" = "user" ]
 }
 
-@test "init: no current-context is user-kind error" {
-  use_mocks
-  write_stub kubectl '
-if [ "$1" = "config" ] && [ "$2" = "current-context" ]; then
-  exit 1
-fi
-printf "{}\n"
-'
-  kube_cache::init || true
+@test "init: rejects stray --context arg (entrypoint should have stripped it)" {
+  _stub_kubectl
+  kube_cache::init --context=foo || true
   [ "$KUBE_CACHE_ERROR_KIND" = "user" ]
-  [[ "$KUBE_CACHE_ERROR" == *"current context"* ]]
+}
+
+@test "init: missing KSTACK_KUBE_CONTEXT is infra-kind error" {
+  _stub_kubectl
+  unset KSTACK_KUBE_CONTEXT
+  kube_cache::init || true
+  [ "$KUBE_CACHE_ERROR_KIND" = "infra" ]
+  [[ "$KUBE_CACHE_ERROR" == *"KSTACK_KUBE_CONTEXT"* ]]
 }
 
 @test "init: missing KSTACK_ROOT is infra-kind error" {
   _stub_kubectl
   unset KSTACK_ROOT
-  kube_cache::init --context=ctx || true
+  kube_cache::init || true
   [ "$KUBE_CACHE_ERROR_KIND" = "infra" ]
 }
 
 @test "init: returns non-zero on any error" {
   _stub_kubectl
-  run kube_cache::init --context=ctx --ttl=bogus
+  run kube_cache::init --ttl=bogus
   [ "$status" -ne 0 ]
 }
 
 @test "init: context sha changes with context name" {
   _stub_kubectl
-  kube_cache::init --context=alpha
+  export KSTACK_KUBE_CONTEXT=alpha
+  kube_cache::init
   local a="$KUBE_CACHE_DIR"
-  kube_cache::init --context=beta
+  export KSTACK_KUBE_CONTEXT=beta
+  kube_cache::init
   [ "$a" != "$KUBE_CACHE_DIR" ]
 }
 
 @test "ensure_list: writes cache file and passes extra args through" {
   _stub_kubectl
-  kube_cache::init --context=ctx
+  kube_cache::init
   kube_cache::ensure_list pods --all-namespaces
   local f="$KUBE_CACHE_DIR/pods.json"
   [ -f "$f" ]
@@ -158,7 +154,7 @@ printf "{}\n"
 
 @test "ensure_list: skips kubectl when file is fresh" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=1h
+  kube_cache::init --ttl=1h
   kube_cache::ensure_list nodes
   local first
   first="$(wc -l < "$KUBECTL_LOG")"
@@ -170,10 +166,9 @@ printf "{}\n"
 
 @test "ensure_list: ttl=0 forces a refetch on every call" {
   _stub_kubectl
-  kube_cache::init --context=ctx --ttl=0s
+  kube_cache::init --ttl=0s
   kube_cache::ensure_list nodes
   kube_cache::ensure_list nodes
-  # two get-nodes invocations, plus any current-context probe
   local n
   n="$(grep -c 'get nodes' "$KUBECTL_LOG" || true)"
   [ "$n" = "2" ]
@@ -181,11 +176,8 @@ printf "{}\n"
 
 @test "ensure_list: returns non-zero when kubectl fails and leaves no stale file" {
   use_mocks
-  write_stub kubectl '
-if [ "$1" = "config" ]; then printf "ctx\n"; exit 0; fi
-exit 7
-'
-  kube_cache::init --context=ctx
+  write_stub kubectl 'exit 7'
+  kube_cache::init
   run kube_cache::ensure_list pods
   [ "$status" -ne 0 ]
   [ ! -f "$KUBE_CACHE_DIR/pods.json" ]
@@ -194,14 +186,14 @@ exit 7
 
 @test "ensure_version: writes cluster.json" {
   _stub_kubectl
-  kube_cache::init --context=ctx
+  kube_cache::init
   kube_cache::ensure_version
   grep -q "v1.30.0" "$KUBE_CACHE_DIR/cluster.json"
 }
 
 @test "path: returns <dir>/<name>.json without fetching" {
   _stub_kubectl
-  kube_cache::init --context=ctx
+  kube_cache::init
   : > "$KUBECTL_LOG"
   local p
   p="$(kube_cache::path pods)"

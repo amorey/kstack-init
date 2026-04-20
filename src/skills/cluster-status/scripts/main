@@ -36,6 +36,11 @@ fi
 # shellcheck source=lib/pod-info.sh
 . "$SCRIPT_DIR/lib/pod-info.sh"
 
+if [ -z "${KSTACK_KUBE_CONTEXT:-}" ]; then
+  response::infra_error "KSTACK_KUBE_CONTEXT not set; run this script via the skill entrypoint."
+  exit 0
+fi
+
 # wait_or_die <noun> <pid>
 #   Wait on a backgrounded ensure_* job; on failure, emit infra error and exit 0.
 wait_or_die() {
@@ -47,16 +52,9 @@ wait_or_die() {
 }
 
 main() {
-  local context="" ttl="15m" refresh="false"
+  local ttl="15m" refresh="false"
   while [ $# -gt 0 ]; do
     case "$1" in
-      --context=*) context="${1#--context=}"; shift ;;
-      --context)
-        if [ $# -lt 2 ]; then
-          response::user_error "Flag --context requires a value."
-          exit 0
-        fi
-        context="$2"; shift 2 ;;
       --refresh) refresh="true"; shift ;;
       --ttl=*) ttl="${1#--ttl=}"; shift ;;
       --ttl)
@@ -71,7 +69,7 @@ main() {
     esac
   done
 
-  local init_args=(--context="$context" --ttl="$ttl")
+  local init_args=(--ttl="$ttl")
   [ "$refresh" = "true" ] && init_args+=(--refresh)
   if ! kube_cache::init "${init_args[@]}"; then
     case "$KUBE_CACHE_ERROR_KIND" in
@@ -152,10 +150,9 @@ main() {
   # agent_context: skill-specific follow-up metadata. Compact JSON so future
   # fields can be added without schema churn. Values are JSON-escaped inline
   # since we only carry short path/identifier strings.
-  local ctx_esc dir_esc agent_ctx
-  ctx_esc="$(printf '%s' "$KUBE_CACHE_CONTEXT" | response::_escape)"
+  local dir_esc agent_ctx
   dir_esc="$(printf '%s' "$KUBE_CACHE_DIR" | response::_escape)"
-  agent_ctx="$(printf '{"cache_dir":"%s","context":"%s"}' "$dir_esc" "$ctx_esc")"
+  agent_ctx="$(printf '{"cache_dir":"%s"}' "$dir_esc")"
 
   response::ok_verbatim "$content" "$agent_ctx"
   exit 0

@@ -21,10 +21,11 @@ setup() {
   # Global-mode install layout under $HOME.
   ROOT="$HOME/.config/kstack"
   mkdir -p "$ROOT/bin" "$ROOT/lib" "$ROOT/cache"
-  cp "$SRC_ROOT/bin/entrypoint"      "$ROOT/bin/entrypoint"
-  cp "$SRC_ROOT/lib/cache.sh"        "$ROOT/lib/cache.sh"
-  cp "$SRC_ROOT/lib/update-check.sh" "$ROOT/lib/update-check.sh"
-  cp "$SRC_ROOT/lib/response.sh"     "$ROOT/lib/response.sh"
+  cp "$SRC_ROOT/bin/entrypoint"        "$ROOT/bin/entrypoint"
+  cp "$SRC_ROOT/lib/cache.sh"          "$ROOT/lib/cache.sh"
+  cp "$SRC_ROOT/lib/update-check.sh"   "$ROOT/lib/update-check.sh"
+  cp "$SRC_ROOT/lib/response.sh"       "$ROOT/lib/response.sh"
+  cp "$SRC_ROOT/lib/kube-context.sh"   "$ROOT/lib/kube-context.sh"
   chmod +x "$ROOT/bin/entrypoint"
   CACHE_FILE="$ROOT/cache/update.json"
   EP="$ROOT/bin/entrypoint"
@@ -36,6 +37,10 @@ setup() {
 
   # Installed version — non-main so the update check engages.
   echo "v1.0.0" > "$ROOT/install.conf"
+
+  # Satisfy the resolver for tests that don't exercise context resolution
+  # explicitly. Tests that do override or unset this.
+  export KSTACK_KUBE_CONTEXT="test-ctx"
 }
 
 # stub_git (and stub_git --fail) are provided by test_helper.bash.
@@ -229,11 +234,12 @@ EOF
   [[ "$msg" == *"not executable"* ]]
 }
 
-@test "scripts/main sees KSTACK_* env vars + forwarded argv" {
+@test "scripts/main sees KSTACK_* env vars + forwarded argv (--context stripped)" {
   cat > "$SKILL_DIR/scripts/main" <<'EOF'
 #!/usr/bin/env bash
-printf 'root=%s dir=%s name=%s args=%s\n' \
-  "${KSTACK_ROOT:-}" "${KSTACK_SKILL_DIR:-}" "${KSTACK_SKILL_NAME:-}" "$*"
+printf 'root=%s dir=%s name=%s kube=%s args=%s\n' \
+  "${KSTACK_ROOT:-}" "${KSTACK_SKILL_DIR:-}" "${KSTACK_SKILL_NAME:-}" \
+  "${KSTACK_KUBE_CONTEXT:-}" "$*"
 exit 0
 EOF
   chmod +x "$SKILL_DIR/scripts/main"
@@ -244,7 +250,94 @@ EOF
   [[ "$output" == *"root=$ROOT"* ]]
   [[ "$output" == *"dir=$SKILL_DIR"* ]]
   [[ "$output" == *"name=demo"* ]]
-  [[ "$output" == *"args=--context=dev foo bar"* ]]
+  [[ "$output" == *"kube=dev"* ]]
+  # --context was stripped; remaining args forwarded in order.
+  [[ "$output" == *"args=foo bar"* ]]
+}
+
+# ─── kube context resolution ───────────────────────────────────
+
+@test "kube_context: --context flag wins over env and kubectl" {
+  stub_git
+  export MOCK_TAGS="v1.0.0"
+  export KSTACK_KUBE_CONTEXT="env-ctx"
+  run "$EP" --skill-dir="$SKILL_DIR" -- --context=flag-ctx
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"kube_context":"flag-ctx"'* ]]
+}
+
+@test "kube_context: env var used when no flag" {
+  stub_git
+  export MOCK_TAGS="v1.0.0"
+  export KSTACK_KUBE_CONTEXT="env-ctx"
+  run "$EP" --skill-dir="$SKILL_DIR" --
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"kube_context":"env-ctx"'* ]]
+}
+
+@test "kube_context: falls back to kubectl current-context" {
+  stub_git
+  export MOCK_TAGS="v1.0.0"
+  unset KSTACK_KUBE_CONTEXT
+  write_stub kubectl '
+case "$*" in
+  "config current-context") printf "kc-live\n" ;;
+  *) exit 2 ;;
+esac
+'
+  run "$EP" --skill-dir="$SKILL_DIR" --
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"kube_context":"kc-live"'* ]]
+}
+
+@test "kube_context: unresolvable context yields user error envelope" {
+  stub_git
+  export MOCK_TAGS="v1.0.0"
+  unset KSTACK_KUBE_CONTEXT
+  # Stub kubectl to fail current-context (simulates no configured context).
+  # Can't rely on removing kubectl from PATH: bash and kubectl commonly
+  # share a bin dir (e.g. /opt/homebrew/bin), so pruning PATH to bash-only
+  # would still expose a real kubectl and leak the host's context.
+  write_stub kubectl 'exit 1'
+  run "$EP" --skill-dir="$SKILL_DIR" --
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"user"'* ]]
+  msg="$(envelope_field "$output" message)"
+  [[ "$msg" == *"kube context"* ]]
+}
+
+@test "kube_context: empty --context value yields user error envelope" {
+  stub_git
+  export MOCK_TAGS="v1.0.0"
+  run "$EP" --skill-dir="$SKILL_DIR" -- --context=
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"user"'* ]]
+}
+
+@test "kube_context: scripts/main inherits exported KSTACK_KUBE_CONTEXT" {
+  cat > "$SKILL_DIR/scripts/main" <<'EOF'
+#!/usr/bin/env bash
+printf 'kube=%s\n' "${KSTACK_KUBE_CONTEXT:-<unset>}"
+exit 0
+EOF
+  chmod +x "$SKILL_DIR/scripts/main"
+  stub_git
+  export MOCK_TAGS="v1.0.0"
+  run "$EP" --skill-dir="$SKILL_DIR" -- --context=staging
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"kube=staging"* ]]
+}
+
+@test "kube_context: preamble envelope (no scripts/main) carries kube_context" {
+  stub_git
+  export MOCK_TAGS="v1.0.0"
+  export KSTACK_KUBE_CONTEXT="ambient"
+  run "$EP" --skill-dir="$SKILL_DIR" --
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"render":"agent"'* ]]
+  [[ "$output" == *'"kube_context":"ambient"'* ]]
 }
 
 # ─── parser errors ─────────────────────────────────────────────

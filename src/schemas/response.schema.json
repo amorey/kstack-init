@@ -18,6 +18,10 @@
     "notice": {
       "type": "string",
       "description": "Optional operator notice (update-available banner, etc.). When present the agent prepends it verbatim to its reply, above any `content` or `message`."
+    },
+    "kube_context": {
+      "type": "string",
+      "description": "The kube context this turn ran against, resolved by the entrypoint (precedence: --context flag > $KSTACK_KUBE_CONTEXT env > `kubectl config current-context`). When present the agent treats it as the pinned cluster identity and threads `--context=<value>` into every follow-up kstack skill call in the session. Absent when the entrypoint could not resolve a context (errors before the skill body ran)."
     }
   },
   "oneOf": [
@@ -62,7 +66,8 @@
       "status": "ok",
       "render": "verbatim",
       "content": "Context: kind-kstack-test\nAPI server: https://127.0.0.1:6443\n...",
-      "agent_context": "{\"cache_dir\":\"/home/user/.kstack/cache/cluster-status/9e6850d5af87\",\"context\":\"kind-kstack-test\"}"
+      "agent_context": "{\"cache_dir\":\"/home/user/.kstack/cache/cluster-status/9e6850d5af87\"}",
+      "kube_context": "kind-kstack-test"
     },
     {
       "kstack": "1",

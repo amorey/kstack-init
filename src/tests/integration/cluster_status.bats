@@ -17,10 +17,36 @@
 setup() {
   load '../test_helper.bash'
   common_setup
+  # KSTACK_ROOT is the cache base — a fresh tmpdir keeps tests off the repo
+  # cache dir and sidesteps Windows symlink issues. The two libs main sources
+  # via $KSTACK_ROOT/lib/ are copied in rather than symlinked for the same
+  # reason.
+  export KSTACK_ROOT="$TMPDIR_TEST/kstack"
+  mkdir -p "$KSTACK_ROOT/lib"
+  cp "$SRC_ROOT/lib/response.sh"   "$KSTACK_ROOT/lib/"
+  cp "$SRC_ROOT/lib/kube-cache.sh" "$KSTACK_ROOT/lib/"
+  export KSTACK_KUBE_CONTEXT="test-ctx"
 }
 
 @test "main script exists and is executable" {
   [ -x "$SRC_ROOT/skills/cluster-status/scripts/main" ]
+}
+
+@test "main: rejects --context (entrypoint owns resolution)" {
+  run "$SRC_ROOT/skills/cluster-status/scripts/main" --context=foo
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"user"'* ]]
+  [[ "$output" == *"Unknown flag"* ]]
+}
+
+@test "main: requires KSTACK_KUBE_CONTEXT env var" {
+  unset KSTACK_KUBE_CONTEXT
+  run "$SRC_ROOT/skills/cluster-status/scripts/main"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"status":"error"'* ]]
+  [[ "$output" == *'"kind":"infra"'* ]]
+  [[ "$output" == *"KSTACK_KUBE_CONTEXT"* ]]
 }
 
 @test "main: ensure_version, nodes, and pods fetches run in parallel" {
@@ -36,9 +62,6 @@ setup() {
   write_stub kubectl "
 LOG_DIR='$stub_log'
 args=\"\$*\"
-case \"\$args\" in
-  *'config current-context'*) printf 'test-ctx\n'; exit 0 ;;
-esac
 case \"\$args\" in
   *version*)     id=version ;;
   *'get nodes'*) id=nodes ;;
@@ -60,18 +83,10 @@ case \"\$id\" in
 esac
 "
 
-  # KSTACK_ROOT is the cache base, so use a fresh tmpdir and copy the two
-  # libs main needs. Avoids both Windows-symlink issues and polluting the
-  # source tree's cache/ dir.
-  export KSTACK_ROOT="$TMPDIR_TEST/kstack"
-  mkdir -p "$KSTACK_ROOT/lib"
-  cp "$SRC_ROOT/lib/response.sh"   "$KSTACK_ROOT/lib/"
-  cp "$SRC_ROOT/lib/kube-cache.sh" "$KSTACK_ROOT/lib/"
-
   # Don't assert on $status — render libs may not love empty-list payloads
   # and that's fine; we only care that all three fetches got launched
   # concurrently.
-  run "$SRC_ROOT/skills/cluster-status/scripts/main" --context=test-ctx
+  run "$SRC_ROOT/skills/cluster-status/scripts/main"
 
   local n
   n=$(find "$stub_log" -maxdepth 1 -name 'all_started_*' | wc -l | tr -d ' ')
