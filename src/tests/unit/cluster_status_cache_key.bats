@@ -33,18 +33,32 @@ setup() {
 }
 
 # _install_tools <tool...>
-#   Populate MOCK_BIN with symlinks (or copies, as fallback) of the listed
-#   tools so a PATH="$MOCK_BIN" subshell can still resolve them. Used to
-#   construct a tightly-controlled PATH that excludes one or both hashers.
+#   Populate MOCK_BIN with shell wrappers that exec the real binary in
+#   place, so a PATH="$MOCK_BIN" subshell can still resolve the listed
+#   tools while blocking anything we didn't list. Used to construct a
+#   tightly-controlled PATH that excludes one or both hashers.
+#
+#   Implemented via wrapper scripts (not symlink/copy) because MSYS2
+#   binaries on Git Bash dynamically link DLLs resolved from the binary's
+#   on-disk location — a copied sha256sum.exe in MOCK_BIN fails to load
+#   its shared libraries. A wrapper exec's the real binary in place, so
+#   DLL resolution keeps working.
 _install_tools() {
   use_mocks
-  local tool src
+  local tool src bash_abs
+  # Absolute bash path in the shebang so the wrapper runs even though
+  # MOCK_BIN is the only PATH entry (no env, no bash discoverable).
+  bash_abs="$(command -v bash)"
   for tool in "$@"; do
     src="$(command -v "$tool")" || {
       echo "required tool not found on host PATH: $tool" >&2
       return 1
     }
-    ln -s "$src" "$MOCK_BIN/$tool" 2>/dev/null || cp "$src" "$MOCK_BIN/$tool"
+    cat > "$MOCK_BIN/$tool" <<EOF
+#!$bash_abs
+exec "$src" "\$@"
+EOF
+    chmod +x "$MOCK_BIN/$tool"
   done
 }
 

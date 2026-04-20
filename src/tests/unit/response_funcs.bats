@@ -125,7 +125,17 @@ require_jq() { command -v jq >/dev/null 2>&1 || skip "jq not available"; }
   require_jq
   export KSTACK_NOTICE=$'line 1\n"line 2"'
   out="$(response::user_error "nope")"
-  [ "$(printf '%s' "$out" | jq -r '.notice')" = $'line 1\n"line 2"' ]
+  actual="$(printf '%s' "$out" | jq -r '.notice')"
+  expected=$'line 1\n"line 2"'
+  if [ "$actual" != "$expected" ]; then
+    echo "--- envelope (out) ---" >&2
+    printf '%s' "$out"      | od -c >&2
+    echo "--- actual (jq -r .notice) ---" >&2
+    printf '%s' "$actual"   | od -c >&2
+    echo "--- expected ---" >&2
+    printf '%s' "$expected" | od -c >&2
+    return 1
+  fi
 }
 
 @test "ok_verbatim reads from stdin when no arg is given" {
