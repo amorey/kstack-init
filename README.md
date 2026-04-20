@@ -425,18 +425,22 @@ Both helpers prompt before removing. They clear the install root (`~/.config/kst
 
 ## Development
 
-The installer payload lives under `src/` (skills, helpers, lib, schemas). Dev tooling — tests, scripts, CI — sits at the repo root alongside `install`, `README.md`, and `assets/`. If you're hacking on kstack, see `CLAUDE.md` for the full contributor guide.
+The installer payload lives under `src/` (skills, helpers, lib, schemas). Dev tooling — the `Makefile`, `scripts/`, `tests/`, CI — sits at the repo root. If you're hacking on kstack, see `CLAUDE.md` for the full contributor guide.
 
-Run the test suite with bats-core:
+Common contributor commands, via the root `Makefile`:
 
 ```console
-brew install bats-core        # macOS
-# or: apt install bats        # Debian/Ubuntu
-
-./scripts/test.sh
+make install      # dev-mode install — renders skills into <repo>/.<agent>/skills/
+make test         # fast bats tiers (unit + integration)
+make test-e2e     # cluster-backed tier (kind + docker)
+make test-evals   # eval harness (requires ANTHROPIC_API_KEY + claude CLI)
+make lint         # shellcheck
+make clean        # remove dev-mode artifacts
 ```
 
-Tests live in `tests/unit/` (sourced-function tests) and `tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every push and PR — see `.github/workflows/ci.yml`.
+Each target shells out to a script under `scripts/` that's also runnable directly.
+
+`make test` requires bats-core (`brew install bats-core` / `apt install bats`). Tests live in `tests/unit/` (sourced-function tests) and `tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every push and PR — see `.github/workflows/ci.yml`.
 
 ## Get Involved
 

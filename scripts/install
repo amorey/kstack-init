@@ -57,11 +57,9 @@
 
 set -eu
 
-# This script lives at <repo>/scripts/install. SCRIPT_DIR is its own dir,
-# REPO_ROOT the repo top. In dev mode, REPO_ROOT is where install outputs
-# (.kstack/, .<agent>/skills/) land.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# This script lives at <repo>/scripts/install. In dev mode, REPO_ROOT is
+# where install outputs (.kstack/, .<agent>/skills/) land.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 
 # shellcheck source=../src/lib/agents.sh
 . "$REPO_ROOT/src/lib/agents.sh"
