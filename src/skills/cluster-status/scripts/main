@@ -36,15 +36,11 @@ fi
 # shellcheck source=lib/pod-info.sh
 . "$SCRIPT_DIR/lib/pod-info.sh"
 
-# fetch_or_die <noun> <cmd…>
-#   Run cmd; on failure emit an infra-error envelope referencing <noun> +
-#   the active kubectl context, then exit 0. Kept local to this skill
-#   because the phrasing ("Unable to fetch X for context Y.") is
-#   cluster-status-specific.
-fetch_or_die() {
-  local noun="$1"
-  shift
-  "$@" && return 0
+# wait_or_die <noun> <pid>
+#   Wait on a backgrounded ensure_* job; on failure, emit infra error and exit 0.
+wait_or_die() {
+  local noun="$1" pid="$2"
+  wait "$pid" && return 0
   # shellcheck disable=SC2016  # backticks render as inline code in markdown
   response::infra_error "$(printf 'Unable to fetch %s for context `%s`.' "$noun" "$KUBE_CACHE_CONTEXT")"
   exit 0
@@ -85,9 +81,19 @@ main() {
     exit 0
   fi
 
-  fetch_or_die 'cluster version' kube_cache::ensure_version
-  fetch_or_die 'nodes'           kube_cache::ensure_list nodes
-  fetch_or_die 'pods'            kube_cache::ensure_list pods --all-namespaces
+  # Fan the three independent fetches out in parallel — each writes a
+  # different cache file via .tmp+mv, and KUBE_CACHE_* vars are read-only
+  # after init, so there's no shared state to coordinate.
+  local pid_v pid_n pid_p
+  kube_cache::ensure_version &
+  pid_v=$!
+  kube_cache::ensure_list nodes &
+  pid_n=$!
+  kube_cache::ensure_list pods --all-namespaces &
+  pid_p=$!
+  wait_or_die 'cluster version' "$pid_v"
+  wait_or_die 'nodes'           "$pid_n"
+  wait_or_die 'pods'            "$pid_p"
 
   local err_tmp
   err_tmp="$(mktemp 2>/dev/null || echo "/tmp/kstack-cs-err-$$")"

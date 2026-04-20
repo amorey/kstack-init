@@ -22,3 +22,58 @@ setup() {
 @test "main script exists and is executable" {
   [ -x "$SRC_ROOT/skills/cluster-status/scripts/main" ]
 }
+
+@test "main: ensure_version, nodes, and pods fetches run in parallel" {
+  # 3-process barrier: each kubectl invocation drops a start_<id> marker, then
+  # polls (~1s) for three siblings to appear. If they do, it drops an
+  # all_started_<id> marker. Sequential execution can produce at most one
+  # all_started marker (the third fetch sees the prior two start files);
+  # parallel execution produces all three. Asserting on the marker count
+  # avoids any wall-clock heuristic.
+  use_mocks
+  local stub_log="$TMPDIR_TEST/stub"
+  mkdir -p "$stub_log"
+  write_stub kubectl "
+LOG_DIR='$stub_log'
+args=\"\$*\"
+case \"\$args\" in
+  *'config current-context'*) printf 'test-ctx\n'; exit 0 ;;
+esac
+case \"\$args\" in
+  *version*)     id=version ;;
+  *'get nodes'*) id=nodes ;;
+  *'get pods'*)  id=pods ;;
+  *)             id=other ;;
+esac
+touch \"\$LOG_DIR/start_\$id\"
+for _ in \$(seq 1 100); do
+  count=\$(ls \"\$LOG_DIR\"/start_* 2>/dev/null | wc -l)
+  [ \"\$count\" -ge 3 ] && break
+  sleep 0.01
+done
+if [ \"\$(ls \"\$LOG_DIR\"/start_* 2>/dev/null | wc -l)\" -ge 3 ]; then
+  touch \"\$LOG_DIR/all_started_\$id\"
+fi
+case \"\$id\" in
+  version) printf '{\"serverVersion\":{\"gitVersion\":\"v1.30.0\"}}\n' ;;
+  *)       printf '{\"kind\":\"List\",\"items\":[]}\n' ;;
+esac
+"
+
+  # KSTACK_ROOT is the cache base, so use a fresh tmpdir and copy the two
+  # libs main needs. Avoids both Windows-symlink issues and polluting the
+  # source tree's cache/ dir.
+  export KSTACK_ROOT="$TMPDIR_TEST/kstack"
+  mkdir -p "$KSTACK_ROOT/lib"
+  cp "$SRC_ROOT/lib/response.sh"   "$KSTACK_ROOT/lib/"
+  cp "$SRC_ROOT/lib/kube-cache.sh" "$KSTACK_ROOT/lib/"
+
+  # Don't assert on $status — render libs may not love empty-list payloads
+  # and that's fine; we only care that all three fetches got launched
+  # concurrently.
+  run "$SRC_ROOT/skills/cluster-status/scripts/main" --context=test-ctx
+
+  local n
+  n=$(find "$stub_log" -maxdepth 1 -name 'all_started_*' | wc -l | tr -d ' ')
+  [ "$n" = "3" ]
+}
