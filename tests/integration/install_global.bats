@@ -14,69 +14,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# install --global mode: clones $KSTACK_REMOTE_URL at the latest v* tag into
+# $HOME/.config/kstack/upstream and renders skills into $HOME/.<agent>/skills/.
+#
+# setup_file stages the upstream + runs one baseline install into a shared
+# $HOME. Tests assert against that shared tree. Tests that would invalidate
+# the baseline (e.g. re-installing with a different prefix, which prunes the
+# existing demo/ slot) call common_setup to get their own per-test $HOME.
+
+setup_file() {
+  load '../test_helper.bash'
+  common_setup_file
+
+  stage_fake_upstream "$TMPDIR_FILE"
+
+  RUN_INSTALL="$REPO_ROOT/scripts/install"
+  export RUN_INSTALL
+
+  # Baseline install — shared by every test that just reads output.
+  "$RUN_INSTALL" --global --agent claude --quiet
+}
+
 setup() {
   load '../test_helper.bash'
-  common_setup
-
-  # Build a fake "upstream" kstack checkout in a bare+working repo pair.
-  # install --global clones from $KSTACK_REMOTE_URL at the latest v* tag.
-  BARE="$TMPDIR_TEST/kstack.git"
-  WORK="$TMPDIR_TEST/kstack-work"
-  mkdir -p "$BARE" "$WORK"
-  git init --quiet --bare "$BARE"
-  git -c init.defaultBranch=main init --quiet "$WORK"
-  (
-    cd "$WORK"
-    git config user.email "test@example.com"
-    git config user.name "Test"
-
-    mkdir -p scripts src/bin src/lib src/skills/demo/scripts src/skills/_partials
-    # Install script at scripts/install — mirrors the real repo layout.
-    cp "$REPO_ROOT/scripts/install" scripts/install
-    cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
-    cp "$SRC_ROOT/lib/manifest.sh" src/lib/manifest.sh
-    cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
-    cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
-    cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
-    cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" src/skills/_partials/entrypoint.md
-    cp "$FIXTURES_DIR/README.md" README.md
-    cat > src/bin/hello <<'EOF'
-#!/usr/bin/env bash
-echo hello
-EOF
-    cat > src/skills/demo/scripts/snapshot <<'EOF'
-#!/usr/bin/env bash
-echo snap
-EOF
-    chmod +x scripts/install src/bin/hello src/skills/demo/scripts/snapshot
-    git add -A
-    git commit --quiet -m "init"
-    git branch -M main
-    git tag v1.2.3
-    git remote add origin "$BARE"
-    git push --quiet origin main
-    git push --quiet origin v1.2.3
-  )
-
-  # install script under test: the one in the bare-repo-cloned source.
-  # Run the in-repo one — it will ensure_src_checkout from our local bare repo.
-  RUN_INSTALL="$REPO_ROOT/scripts/install"
-  export KSTACK_REMOTE_URL="$BARE"
 }
 
 @test "install --global clones bare repo at latest tag and writes manifest/version" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   [ -f "$HOME/.config/kstack/manifest/version" ]
   run cat "$HOME/.config/kstack/manifest/version"
   [ "$output" = "v1.2.3" ]
 }
 
 @test "install --global renders skills into \$HOME/.claude/skills/<name> (unprefixed by default)" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   assert_file_exists "$HOME/.claude/skills/demo/SKILL.md"
-  # Template must reference the global install root and bin dir.
   run grep -F "install_root: $HOME/.config/kstack" "$HOME/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
   run grep -F "bin_dir: $HOME/.config/kstack/bin" "$HOME/.claude/skills/demo/SKILL.md"
@@ -84,34 +54,24 @@ EOF
 }
 
 @test "install --global substitutes SKILL_DIR to the rendered slot path" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   run grep -F "skill_dir: $HOME/.claude/skills/demo" "$HOME/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
 @test "install --global substitutes SKILL_NAME to the prefixed slot name" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   run grep -F "name: demo" "$HOME/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
 @test "install --global copies skills/<name>/scripts/ into rendered slot" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   [ -x "$HOME/.claude/skills/demo/scripts/snapshot" ]
 }
 
 @test "install --global copies bin/ helpers to \$HOME/.config/kstack/bin" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   [ -x "$HOME/.config/kstack/bin/hello" ]
 }
 
 @test "install --global copies lib/ to \$HOME/.config/kstack/lib" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   [ -f "$HOME/.config/kstack/lib/agents.sh" ]
   [ -f "$HOME/.config/kstack/lib/cache.sh" ]
 }
@@ -119,13 +79,13 @@ EOF
 @test "install --global re-run uses fetch+checkout path" {
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
-  # Second run — should take the "Updating" branch, still succeeds.
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   assert_file_exists "$HOME/.claude/skills/demo/SKILL.md"
 }
 
 @test "install --global reinstall with different prefix prunes prior-prefix slots" {
+  # Isolated HOME — this test reinstalls with a non-empty prefix, which would
+  # prune the shared baseline's demo/ slot and break later assertions.
+  common_setup
   run "$RUN_INSTALL" --global --agent claude --prefix=old- --quiet
   [ "$status" -eq 0 ]
   assert_file_exists "$HOME/.claude/skills/old-demo/SKILL.md"
@@ -136,8 +96,6 @@ EOF
 }
 
 @test "install --global preserves non-kstack skill slot in shared skills dir" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   mkdir -p "$HOME/.claude/skills/user-own"
   echo "mine" > "$HOME/.claude/skills/user-own/SKILL.md"
   run "$RUN_INSTALL" --global --agent claude --quiet
@@ -146,8 +104,6 @@ EOF
 }
 
 @test "install --global prunes orphan helper from \$HOME/.config/kstack/bin" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   echo "#!/bin/sh" > "$HOME/.config/kstack/bin/ghost-helper"
   chmod +x "$HOME/.config/kstack/bin/ghost-helper"
   run "$RUN_INSTALL" --global --agent claude --quiet
@@ -157,8 +113,6 @@ EOF
 }
 
 @test "install --global prunes orphan .sh file from \$HOME/.config/kstack/lib" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
-  [ "$status" -eq 0 ]
   echo "# stale" > "$HOME/.config/kstack/lib/ghost.sh"
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
