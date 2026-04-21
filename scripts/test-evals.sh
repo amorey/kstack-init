@@ -38,8 +38,8 @@
 #   -h | --help               print this message
 set -eu
 
-SRC_ROOT="$(cd "$(dirname "$0")/../src" && pwd)"
-EVAL_DIR="$SRC_ROOT/tests/evals"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+EVAL_DIR="$REPO_ROOT/tests/evals"
 SCENARIO_ROOT="$EVAL_DIR/scenarios"
 ARTIFACTS_ROOT="$EVAL_DIR/artifacts"
 
@@ -76,7 +76,7 @@ for cmd in kind kubectl docker claude jq yq; do
 done
 
 # shellcheck source=../tests/e2e/lib/kind-cluster.sh
-. "$SRC_ROOT/tests/e2e/lib/kind-cluster.sh"
+. "$REPO_ROOT/tests/e2e/lib/kind-cluster.sh"
 # shellcheck source=../tests/evals/lib/runner.sh
 . "$EVAL_DIR/lib/runner.sh"
 

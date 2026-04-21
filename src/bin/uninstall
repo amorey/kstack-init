@@ -16,13 +16,18 @@
 
 # kstack uninstall — remove a global or local kstack install.
 #
+# Reads $ROOT_DIR/manifest/skills (written by scripts/install) to determine
+# which slot dirs belong to kstack. Every slot listed there is deleted from
+# every target agent's skills_dir; the config/install root is removed last.
+# User-authored skills in the same skills_dir are never touched because they
+# never appear in the manifest.
+#
 # Detects which install it's bundled in from $SCRIPT_DIR:
 #
 #   Global: ~/.config/kstack/bin/uninstall — removes ~/.config/kstack and
-#           every ~/.<agent>/skills/kstack-*/ slot.
-#   Local:  <project>/.kstack/bin/uninstall — removes <project>/.kstack
-#           and every <project>/.<agent>/skills/<installed-skill>/ slot
-#           (no kstack- prefix; slot names come from the upstream checkout).
+#           every ~/.<agent>/skills/<slot>/ listed in manifest/skills.
+#   Local:  <project>/.kstack/bin/uninstall — removes <project>/.kstack and
+#           every <project>/.<agent>/skills/<slot>/ listed in manifest/skills.
 #
 # To remove a dev install (contributor layout), just delete the kstack
 # repo directory — the dev install renders skills directly into
@@ -40,6 +45,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # shellcheck source=../lib/agents.sh
 . "$SCRIPT_DIR/../lib/agents.sh"
+# shellcheck source=../lib/manifest.sh
+. "$SCRIPT_DIR/../lib/manifest.sh"
 
 main() {
   if [ -z "${HOME:-}" ]; then
@@ -92,9 +99,13 @@ main() {
     exit 1
   fi
 
-  # Collect every path that would be removed so preview and deletion iterate
-  # the same list. Both modes use the same kstack-* glob — slots are
-  # uniformly prefixed, so this never touches user-authored skills.
+  # The skills manifest is our ownership marker — user-authored skills in
+  # the same skills_dir are never touched because they don't appear in it.
+  local SLOTS=() slot
+  while IFS= read -r slot; do
+    [ -n "$slot" ] && SLOTS+=("$slot")
+  done < <(manifest::read_skills "$ROOT_DIR")
+
   local ENTRIES=() skills_dir h entry
   for h in $TARGET_AGENTS; do
     if [ "$MODE" = global ]; then
@@ -103,7 +114,11 @@ main() {
       skills_dir="$(agent_skills_dir_local "$PROJECT_DIR" "$h")"
     fi
     [ -d "$skills_dir" ] || continue
-    for entry in "$skills_dir"/kstack-*; do
+    # Guard: bash 3.2 (macOS default) treats "${SLOTS[@]}" on an empty array
+    # as unbound under `set -u`.
+    [ ${#SLOTS[@]} -eq 0 ] && continue
+    for slot in "${SLOTS[@]}"; do
+      entry="$skills_dir/$slot"
       [ -e "$entry" ] || [ -L "$entry" ] || continue
       ENTRIES+=("$entry")
     done

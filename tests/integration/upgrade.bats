@@ -19,37 +19,37 @@ setup() {
   common_setup
 }
 
-@test "upgrade in global location execs upstream/install --global" {
+@test "upgrade in global location execs upstream/scripts/install --global" {
   # Stage a fake global install. The upgrade helper checks for an upstream
   # git checkout to distinguish managed installs from dev installs, so the
   # mocked upstream/ needs to be an actual (even if empty) git repo.
-  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/upstream"
+  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/upstream/scripts"
   git init --quiet "$HOME/.config/kstack/upstream"
   cp "$SRC_ROOT/bin/upgrade" "$HOME/.config/kstack/bin/upgrade"
   chmod +x "$HOME/.config/kstack/bin/upgrade"
-  cat > "$HOME/.config/kstack/upstream/install" <<'EOF'
+  cat > "$HOME/.config/kstack/upstream/scripts/install" <<'EOF'
 #!/usr/bin/env bash
 echo "GLOBAL-INSTALL:$*"
 EOF
-  chmod +x "$HOME/.config/kstack/upstream/install"
+  chmod +x "$HOME/.config/kstack/upstream/scripts/install"
 
   run "$HOME/.config/kstack/bin/upgrade" --extra
   [ "$status" -eq 0 ]
   [[ "$output" == *"GLOBAL-INSTALL:--global --extra"* ]]
 }
 
-@test "upgrade in local layout execs upstream/install --local from project dir" {
+@test "upgrade in local layout execs upstream/scripts/install --local from project dir" {
   # Stage a fake local install: <project>/.kstack/{bin,upstream/.git,…}.
   PROJECT="$TMPDIR_TEST/proj"
-  mkdir -p "$PROJECT/.kstack/bin" "$PROJECT/.kstack/upstream"
+  mkdir -p "$PROJECT/.kstack/bin" "$PROJECT/.kstack/upstream/scripts"
   git init --quiet "$PROJECT/.kstack/upstream"  # make it look like a checkout
   cp "$SRC_ROOT/bin/upgrade" "$PROJECT/.kstack/bin/upgrade"
   chmod +x "$PROJECT/.kstack/bin/upgrade"
-  cat > "$PROJECT/.kstack/upstream/install" <<EOF
+  cat > "$PROJECT/.kstack/upstream/scripts/install" <<EOF
 #!/usr/bin/env bash
 echo "LOCAL-INSTALL:\$*:pwd=\$PWD"
 EOF
-  chmod +x "$PROJECT/.kstack/upstream/install"
+  chmod +x "$PROJECT/.kstack/upstream/scripts/install"
 
   run "$PROJECT/.kstack/bin/upgrade" --extra
   [ "$status" -eq 0 ]

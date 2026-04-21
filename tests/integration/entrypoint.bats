@@ -20,9 +20,10 @@ setup() {
 
   # Global-mode install layout under $HOME.
   ROOT="$HOME/.config/kstack"
-  mkdir -p "$ROOT/bin" "$ROOT/lib" "$ROOT/cache"
+  mkdir -p "$ROOT/bin" "$ROOT/lib" "$ROOT/cache" "$ROOT/manifest"
   cp "$SRC_ROOT/bin/entrypoint"        "$ROOT/bin/entrypoint"
   cp "$SRC_ROOT/lib/cache.sh"          "$ROOT/lib/cache.sh"
+  cp "$SRC_ROOT/lib/manifest.sh"       "$ROOT/lib/manifest.sh"
   cp "$SRC_ROOT/lib/update-check.sh"   "$ROOT/lib/update-check.sh"
   cp "$SRC_ROOT/lib/response.sh"       "$ROOT/lib/response.sh"
   cp "$SRC_ROOT/lib/kube-context.sh"   "$ROOT/lib/kube-context.sh"
@@ -36,7 +37,7 @@ setup() {
   printf 'help body\n' > "$SKILL_DIR/references/help.md"
 
   # Installed version — non-main so the update check engages.
-  echo "v1.0.0" > "$ROOT/install.conf"
+  echo "v1.0.0" > "$ROOT/manifest/version"
 
   # Satisfy the resolver for tests that don't exercise context resolution
   # explicitly. Tests that do override or unset this.
@@ -158,8 +159,8 @@ EOF
   [[ "$output" != *'"notice"'* ]]
 }
 
-@test "no install.conf → silent preamble envelope" {
-  rm "$ROOT/install.conf"
+@test "no manifest/version → silent preamble envelope" {
+  rm "$ROOT/manifest/version"
   stub_git
   export MOCK_TAGS="v9.0.0"
   run "$EP" --skill-dir="$SKILL_DIR" --
@@ -167,8 +168,8 @@ EOF
   [[ "$output" != *'"notice"'* ]]
 }
 
-@test "install.conf=main → silent preamble (pre-release)" {
-  echo "main" > "$ROOT/install.conf"
+@test "manifest/version=main → silent preamble (pre-release)" {
+  echo "main" > "$ROOT/manifest/version"
   stub_git
   export MOCK_TAGS="v9.0.0"
   run "$EP" --skill-dir="$SKILL_DIR" --

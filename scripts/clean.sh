@@ -17,8 +17,8 @@
 # scripts/clean.sh — wipe dev-mode install artifacts.
 #
 # For development. Removes the rendered skills directories, caches, and the
-# legacy build dir from the kstack repo so you can re-run ./install against
-# a clean tree.
+# legacy build dir from the kstack repo so you can re-run `make install`
+# against a clean tree.
 #
 # Safe to run any time. Only touches paths that are gitignored.
 

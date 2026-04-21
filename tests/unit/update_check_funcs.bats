@@ -22,6 +22,8 @@ setup() {
   common_setup
   # shellcheck source=../../lib/cache.sh
   . "$SRC_ROOT/lib/cache.sh"
+  # shellcheck source=../../lib/manifest.sh
+  . "$SRC_ROOT/lib/manifest.sh"
   # shellcheck source=../../lib/update-check.sh
   . "$SRC_ROOT/lib/update-check.sh"
 }
@@ -97,9 +99,9 @@ setup() {
   [ -z "$NOTICE" ]
 }
 
-@test "uc_resolve_installed_version: reads install.conf" {
-  mkdir -p "$HOME/root"
-  echo "v1.2.3" > "$HOME/root/install.conf"
+@test "uc_resolve_installed_version: reads manifest/version" {
+  mkdir -p "$HOME/root/manifest"
+  echo "v1.2.3" > "$HOME/root/manifest/version"
   uc_resolve_installed_version "$HOME/root"
   [ "$INSTALLED" = "v1.2.3" ]
 }
@@ -111,8 +113,8 @@ setup() {
 }
 
 @test "uc_resolve_installed_version: 'main' → empty (pre-release)" {
-  mkdir -p "$HOME/root"
-  echo "main" > "$HOME/root/install.conf"
+  mkdir -p "$HOME/root/manifest"
+  echo "main" > "$HOME/root/manifest/version"
   uc_resolve_installed_version "$HOME/root"
   [ -z "$INSTALLED" ]
 }

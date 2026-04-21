@@ -16,8 +16,9 @@
 # shellcheck disable=SC2034  # functions set vars in the caller's scope (uc_*, NOTICE).
 # kstack update-check library — shared by bin/check-update and bin/entrypoint.
 #
-# Source this file; do not execute it. Requires cache.sh to be sourced first
-# (uses resolve_cache_paths / read_cache_fields / write_cache_json).
+# Source this file; do not execute it. Requires cache.sh and manifest.sh to
+# be sourced first (uses resolve_cache_paths / read_cache_fields /
+# write_cache_json, and manifest::read_version).
 
 UC_DEFAULT_REMOTE_URL="https://github.com/kubetail-org/kstack.git"
 UC_DEFAULT_TTL_SECS=$((24 * 60 * 60))
@@ -42,12 +43,11 @@ uc_iso_to_epoch() {
   esac
 }
 
-# uc_resolve_installed_version $root_dir — sets INSTALLED from $root_dir/install.conf.
-# Emits empty when: install.conf missing, file empty, or pinned to "main"
-# (pre-release dev checkout — no update check applies).
+# uc_resolve_installed_version $root_dir — sets INSTALLED from the install
+# manifest. Emits empty when: version file is missing, empty, or pinned to
+# "main" (pre-release dev checkout — no update check applies).
 uc_resolve_installed_version() {
-  INSTALLED=""
-  [ -f "$1/install.conf" ] && read -r INSTALLED < "$1/install.conf" 2>/dev/null
+  INSTALLED="$(manifest::read_version "$1")"
   case "$INSTALLED" in
     ""|main) INSTALLED="" ;;
   esac
