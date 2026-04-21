@@ -59,13 +59,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install bats-core + jq (Ubuntu)
+      - name: Install bats-core + jq + parallel (Ubuntu)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y bats jq
+        run: sudo apt-get update && sudo apt-get install -y bats jq parallel
 
-      - name: Install bats-core + jq (macOS)
+      - name: Install bats-core + jq + parallel (macOS)
         if: runner.os == 'macOS'
-        run: brew install bats-core jq
+        run: brew install bats-core jq parallel
 
       - name: Install bats-core (Windows)
         if: runner.os == 'Windows'
@@ -76,6 +76,20 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: choco install jq -y
+
+      # GNU parallel is required by `bats --jobs`. Git Bash ships Perl, so
+      # install the self-contained upstream Perl script directly — avoids the
+      # uncertainty of third-party Windows packaging around CMD shims.
+      - name: Install GNU parallel (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL 'https://git.savannah.gnu.org/cgit/parallel.git/plain/src/parallel' \
+            -o "$HOME/.local/bin/parallel"
+          chmod +x "$HOME/.local/bin/parallel"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/parallel" --version | head -1
 
       - name: Configure git identity
         run: |
