@@ -31,6 +31,85 @@ common_setup() {
   mkdir -p "$HOME"
 }
 
+# File-level companion to common_setup. Call from setup_file so tests in the
+# same file share state (HOME, baseline installs) while still being isolated
+# from other test files. Exports TMPDIR_FILE and HOME.
+common_setup_file() {
+  TMPDIR_FILE="${BATS_FILE_TMPDIR:-$(mktemp -d)}"
+  export HOME="$TMPDIR_FILE/home"
+  mkdir -p "$HOME"
+}
+
+# Stage a minimal fake kstack source tree at $1 mirroring the real repo layout
+# (scripts/install, src/{bin,lib,schemas,skills/demo,skills/_partials},
+# README.md). Used by install_dev.bats to build a dev-mode fake checkout.
+stage_dev_source() {
+  local root="$1"
+  mkdir -p "$root/scripts" \
+           "$root/src/bin" "$root/src/lib" "$root/src/schemas" \
+           "$root/src/skills/demo" "$root/src/skills/_partials"
+  cp "$REPO_ROOT/scripts/install" "$root/scripts/install"
+  cp "$SRC_ROOT/lib/agents.sh" "$root/src/lib/agents.sh"
+  cp "$SRC_ROOT/lib/manifest.sh" "$root/src/lib/manifest.sh"
+  cp "$SRC_ROOT/lib/cache.sh" "$root/src/lib/cache.sh"
+  cp "$SRC_ROOT/schemas/response.schema.json" "$root/src/schemas/response.schema.json"
+  cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$root/src/skills/demo/SKILL.md.tmpl"
+  cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$root/src/skills/_partials/global-flags.md"
+  cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" "$root/src/skills/_partials/entrypoint.md"
+  cp "$FIXTURES_DIR/README.md" "$root/README.md"
+  cat > "$root/src/bin/hello" <<'EOF'
+#!/usr/bin/env bash
+echo hello
+EOF
+  chmod +x "$root/src/bin/hello" "$root/scripts/install"
+}
+
+# Build a fake kstack upstream under $1: a bare repo at $1/kstack.git plus a
+# working tree at $1/kstack-work committed and pushed at tag v1.2.3. Exports
+# BARE and KSTACK_REMOTE_URL so install --local / --global can clone from it.
+# Used by install_local.bats and install_global.bats.
+stage_fake_upstream() {
+  local tmp="$1"
+  BARE="$tmp/kstack.git"
+  local work="$tmp/kstack-work"
+  mkdir -p "$BARE" "$work"
+  git init --quiet --bare "$BARE"
+  git -c init.defaultBranch=main init --quiet "$work"
+  (
+    cd "$work" || exit 1
+    git config user.email "test@example.com"
+    git config user.name "Test"
+
+    mkdir -p scripts src/bin src/lib src/skills/demo/scripts src/skills/_partials
+    cp "$REPO_ROOT/scripts/install" scripts/install
+    cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
+    cp "$SRC_ROOT/lib/manifest.sh" src/lib/manifest.sh
+    cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
+    cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
+    cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
+    cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" src/skills/_partials/entrypoint.md
+    cp "$FIXTURES_DIR/README.md" README.md
+    cat > src/bin/hello <<'EOF'
+#!/usr/bin/env bash
+echo hello
+EOF
+    cat > src/skills/demo/scripts/snapshot <<'EOF'
+#!/usr/bin/env bash
+echo snap
+EOF
+    chmod +x scripts/install src/bin/hello src/skills/demo/scripts/snapshot
+    git add -A
+    git commit --quiet -m "init"
+    git branch -M main
+    git tag v1.2.3
+    git remote add origin "$BARE"
+    git push --quiet origin main
+    git push --quiet origin v1.2.3
+  )
+  export BARE
+  export KSTACK_REMOTE_URL="$BARE"
+}
+
 # Prepend a dedicated mock dir to PATH. Stubs placed here shadow system commands.
 use_mocks() {
   MOCK_BIN="$TMPDIR_TEST/mock-bin"
