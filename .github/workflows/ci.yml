@@ -67,10 +67,18 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install bats-core jq parallel
 
+      # Install bats-core from its official installer rather than the npm `bats`
+      # package — npm ships a different (older) fork that doesn't consistently
+      # honor --no-parallelize-within-files, which we rely on because Git Bash
+      # lacks flock.
       - name: Install bats-core (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        run: npm install -g bats
+        run: |
+          git clone --depth 1 --branch v1.11.0 https://github.com/bats-core/bats-core.git /tmp/bats-core
+          /tmp/bats-core/install.sh "$HOME/.local"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/bats" --version
 
       - name: Install jq (Windows)
         if: runner.os == 'Windows'
