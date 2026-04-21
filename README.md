@@ -332,7 +332,7 @@ Outdated cluster components, known CVEs, and available version bumps.
 
 ---
 
-### Maintenance
+### Miscellaneous
 
 <dl>
 <dt>
@@ -426,7 +426,7 @@ Both helpers prompt before removing. They clear the install root (`~/.config/kst
 
 ## Development
 
-The installer payload lives under `src/` (skills, helpers, lib, schemas). Dev tooling — the `Makefile`, `scripts/`, `tests/`, CI — sits at the repo root. If you're hacking on kstack, see `CLAUDE.md` for the full contributor guide.
+The installer payload lives under `src/` (skills, helpers, lib, schemas). Dev tooling — the `Makefile`, `scripts/`, `tests/`, CI — sits at the repo root. If you're hacking on kstack, see `CONTRIBUTING.md` for the full contributor guide.
 
 Common contributor commands, via the root `Makefile`:
 
@@ -441,7 +441,7 @@ make clean        # remove dev-mode artifacts
 
 Each target shells out to a script under `scripts/` that's also runnable directly.
 
-`make test` requires bats-core (`brew install bats-core` / `apt install bats`). Tests live in `tests/unit/` (sourced-function tests) and `tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every push and PR — see `.github/workflows/ci.yml`.
+`make test` requires bats-core (`brew install bats-core` / `apt install bats`). Tests live in `tests/unit/` (sourced-function tests) and `tests/integration/` (end-to-end CLI tests against isolated `$HOME` and local bare git repos). CI runs the full suite on Ubuntu, macOS, and Windows for every PR — see `.github/workflows/ci.yml`.
 
 ## Get Involved
 
