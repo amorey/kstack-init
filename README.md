@@ -11,7 +11,7 @@ English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.j
 
 ## Introduction
 
-<img width="350" alt="kstack" src="assets/kstack.svg" />
+<img width="350" alt="kstack" src="https://github.com/user-attachments/assets/9fd0eabb-ff99-4f55-851f-f4a9d68a33b6" />
 
 **Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart and efficient way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process container logs remotely at the source before sending it back to Claude for analysis which makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium) which makes Claude more capable.
 
