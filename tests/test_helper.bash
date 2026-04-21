@@ -40,19 +40,18 @@ common_setup_file() {
   mkdir -p "$HOME"
 }
 
-# Stage a minimal fake kstack source tree at $1 mirroring the real repo layout
-# (scripts/install, src/{bin,lib,schemas,skills/demo,skills/_partials},
-# README.md). Used by install_dev.bats to build a dev-mode fake checkout.
-stage_dev_source() {
+# Stage the files that every fake kstack checkout needs (installer, src/lib,
+# demo skill + partials, README, bin/hello). Callers add their own extras
+# (schemas, skill scripts, etc.) after invoking this.
+stage_src_payload() {
   local root="$1"
   mkdir -p "$root/scripts" \
-           "$root/src/bin" "$root/src/lib" "$root/src/schemas" \
+           "$root/src/bin" "$root/src/lib" \
            "$root/src/skills/demo" "$root/src/skills/_partials"
   cp "$REPO_ROOT/scripts/install" "$root/scripts/install"
   cp "$SRC_ROOT/lib/agents.sh" "$root/src/lib/agents.sh"
   cp "$SRC_ROOT/lib/manifest.sh" "$root/src/lib/manifest.sh"
   cp "$SRC_ROOT/lib/cache.sh" "$root/src/lib/cache.sh"
-  cp "$SRC_ROOT/schemas/response.schema.json" "$root/src/schemas/response.schema.json"
   cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" "$root/src/skills/demo/SKILL.md.tmpl"
   cp "$FIXTURES_DIR/skills/_partials/global-flags.md" "$root/src/skills/_partials/global-flags.md"
   cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" "$root/src/skills/_partials/entrypoint.md"
@@ -64,50 +63,45 @@ EOF
   chmod +x "$root/src/bin/hello" "$root/scripts/install"
 }
 
+# Stage a dev-mode fake kstack checkout at $1. Adds src/schemas/ on top of
+# the shared payload so install dev-mode tests can verify schema copying.
+stage_dev_source() {
+  local root="$1"
+  stage_src_payload "$root"
+  mkdir -p "$root/src/schemas"
+  cp "$SRC_ROOT/schemas/response.schema.json" "$root/src/schemas/response.schema.json"
+}
+
 # Build a fake kstack upstream under $1: a bare repo at $1/kstack.git plus a
 # working tree at $1/kstack-work committed and pushed at tag v1.2.3. Exports
-# BARE and KSTACK_REMOTE_URL so install --local / --global can clone from it.
-# Used by install_local.bats and install_global.bats.
+# KSTACK_REMOTE_URL so install --local / --global can clone from it.
 stage_fake_upstream() {
   local tmp="$1"
-  BARE="$tmp/kstack.git"
+  local bare="$tmp/kstack.git"
   local work="$tmp/kstack-work"
-  mkdir -p "$BARE" "$work"
-  git init --quiet --bare "$BARE"
+  mkdir -p "$bare" "$work"
+  git init --quiet --bare "$bare"
   git -c init.defaultBranch=main init --quiet "$work"
-  (
-    cd "$work" || exit 1
-    git config user.email "test@example.com"
-    git config user.name "Test"
 
-    mkdir -p scripts src/bin src/lib src/skills/demo/scripts src/skills/_partials
-    cp "$REPO_ROOT/scripts/install" scripts/install
-    cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
-    cp "$SRC_ROOT/lib/manifest.sh" src/lib/manifest.sh
-    cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
-    cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
-    cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
-    cp "$FIXTURES_DIR/skills/_partials/entrypoint.md" src/skills/_partials/entrypoint.md
-    cp "$FIXTURES_DIR/README.md" README.md
-    cat > src/bin/hello <<'EOF'
-#!/usr/bin/env bash
-echo hello
-EOF
-    cat > src/skills/demo/scripts/snapshot <<'EOF'
+  stage_src_payload "$work"
+  mkdir -p "$work/src/skills/demo/scripts"
+  cat > "$work/src/skills/demo/scripts/snapshot" <<'EOF'
 #!/usr/bin/env bash
 echo snap
 EOF
-    chmod +x scripts/install src/bin/hello src/skills/demo/scripts/snapshot
-    git add -A
-    git commit --quiet -m "init"
-    git branch -M main
-    git tag v1.2.3
-    git remote add origin "$BARE"
-    git push --quiet origin main
-    git push --quiet origin v1.2.3
-  )
-  export BARE
-  export KSTACK_REMOTE_URL="$BARE"
+  chmod +x "$work/src/skills/demo/scripts/snapshot"
+
+  git -C "$work" config user.email "test@example.com"
+  git -C "$work" config user.name "Test"
+  git -C "$work" add -A
+  git -C "$work" commit --quiet -m "init"
+  git -C "$work" branch -M main
+  git -C "$work" tag v1.2.3
+  git -C "$work" remote add origin "$bare"
+  git -C "$work" push --quiet origin main
+  git -C "$work" push --quiet origin v1.2.3
+
+  export KSTACK_REMOTE_URL="$bare"
 }
 
 # Prepend a dedicated mock dir to PATH. Stubs placed here shadow system commands.

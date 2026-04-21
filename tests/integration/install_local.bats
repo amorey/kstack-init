@@ -43,6 +43,7 @@ setup_file() {
 
 setup() {
   load '../test_helper.bash'
+  cd "$PROJECT"
 }
 
 @test "install --local clones bare repo into \$PWD/.kstack/upstream at latest tag" {
@@ -88,8 +89,6 @@ setup() {
 }
 
 @test "install --local re-run updates the existing upstream checkout" {
-  # Baseline already installed once; this is the "re-run" path.
-  cd "$PROJECT"
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
   assert_file_exists "$PROJECT/.claude/skills/demo/SKILL.md"
@@ -98,14 +97,12 @@ setup() {
 @test "install --local preserves non-kstack skill slot in the shared skills dir" {
   mkdir -p "$PROJECT/.claude/skills/user-own"
   echo "mine" > "$PROJECT/.claude/skills/user-own/SKILL.md"
-  cd "$PROJECT"
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
   assert_file_exists "$PROJECT/.claude/skills/user-own/SKILL.md"
 }
 
 @test "install --local and --global are mutually exclusive" {
-  cd "$PROJECT"
   run "$RUN_INSTALL" --local --global --agent claude --quiet
   [ "$status" -eq 1 ]
   [[ "$output" == *"mutually exclusive"* ]]

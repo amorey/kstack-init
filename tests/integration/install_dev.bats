@@ -349,7 +349,6 @@ EOF
 }
 
 @test "install leaves current skill slot intact on idempotent rerun" {
-  # Baseline already installed once; re-running is the idempotency check.
   run "$RUN_INSTALL" --agent claude --quiet
   [ "$status" -eq 0 ]
   assert_file_exists "$FAKE_ROOT/.claude/skills/demo/SKILL.md"

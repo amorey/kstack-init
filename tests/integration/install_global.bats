@@ -77,7 +77,6 @@ setup() {
 }
 
 @test "install --global re-run uses fetch+checkout path" {
-  # Baseline already installed once; this is the "re-run" path.
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
   assert_file_exists "$HOME/.claude/skills/demo/SKILL.md"
