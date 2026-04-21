@@ -54,6 +54,9 @@ Usage: scripts/test.sh [--all] [--jobs=N]
   --all      Also run tests/e2e via scripts/test-e2e.sh (requires kind)
   --jobs=N   Run up to N bats files in parallel (default: CPU count, if GNU
              parallel is installed). --jobs=1 forces sequential execution.
+
+Output format: TAP with per-test timing, for incremental feedback in parallel
+mode (the default pretty formatter batches a whole file's output at once).
 EOF
       exit 0
       ;;
@@ -82,9 +85,9 @@ if [ -z "$JOBS" ]; then
   fi
 fi
 
-BATS_ARGS=""
+BATS_ARGS="--formatter tap --timing"
 if [ "$JOBS" -gt 1 ]; then
-  BATS_ARGS="--jobs $JOBS"
+  BATS_ARGS="$BATS_ARGS --jobs $JOBS"
 fi
 
 # shellcheck disable=SC2086  # intentional word-split on BATS_ARGS
