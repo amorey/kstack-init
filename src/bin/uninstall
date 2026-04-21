@@ -16,7 +16,7 @@
 
 # kstack uninstall — remove a global or local kstack install.
 #
-# Reads $ROOT_DIR/installed-skills (written by scripts/install) to determine
+# Reads $ROOT_DIR/manifest/skills (written by scripts/install) to determine
 # which slot dirs belong to kstack. Every slot listed there is deleted from
 # every target agent's skills_dir; the config/install root is removed last.
 # User-authored skills in the same skills_dir are never touched because they
@@ -25,9 +25,9 @@
 # Detects which install it's bundled in from $SCRIPT_DIR:
 #
 #   Global: ~/.config/kstack/bin/uninstall — removes ~/.config/kstack and
-#           every ~/.<agent>/skills/<slot>/ listed in installed-skills.
+#           every ~/.<agent>/skills/<slot>/ listed in manifest/skills.
 #   Local:  <project>/.kstack/bin/uninstall — removes <project>/.kstack and
-#           every <project>/.<agent>/skills/<slot>/ listed in installed-skills.
+#           every <project>/.<agent>/skills/<slot>/ listed in manifest/skills.
 #
 # To remove a dev install (contributor layout), just delete the kstack
 # repo directory — the dev install renders skills directly into
@@ -99,13 +99,12 @@ main() {
     exit 1
   fi
 
-  # The installed-skills manifest is our ownership marker — user-authored
-  # skills in the same skills_dir are never touched because they don't appear
-  # in it.
+  # The skills manifest is our ownership marker — user-authored skills in
+  # the same skills_dir are never touched because they don't appear in it.
   local SLOTS=() slot
   while IFS= read -r slot; do
     [ -n "$slot" ] && SLOTS+=("$slot")
-  done < <(manifest::read "$ROOT_DIR")
+  done < <(manifest::read_skills "$ROOT_DIR")
 
   local ENTRIES=() skills_dir h entry
   for h in $TARGET_AGENTS; do

@@ -18,14 +18,15 @@ setup() {
   load '../test_helper.bash'
   common_setup
 
-  # Stage a fake global install: config dir, lib, bin, an installed-skills
-  # manifest, and the slot dirs the manifest references.
-  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/lib"
+  # Stage a fake global install: config dir, lib, bin, a manifest/skills
+  # file, and the slot dirs the manifest references.
+  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/lib" \
+           "$HOME/.config/kstack/manifest"
   cp "$SRC_ROOT/bin/uninstall" "$HOME/.config/kstack/bin/uninstall"
   cp "$SRC_ROOT/lib/agents.sh" "$HOME/.config/kstack/lib/agents.sh"
   cp "$SRC_ROOT/lib/manifest.sh" "$HOME/.config/kstack/lib/manifest.sh"
   chmod +x "$HOME/.config/kstack/bin/uninstall"
-  printf '%s\n' kstack-demo kstack-other > "$HOME/.config/kstack/installed-skills"
+  printf '%s\n' kstack-demo kstack-other > "$HOME/.config/kstack/manifest/skills"
 
   mkdir -p "$HOME/.claude/skills/kstack-demo" "$HOME/.claude/skills/kstack-other"
   mkdir -p "$HOME/.claude/skills/non-kstack"  # must NOT be removed
@@ -44,7 +45,7 @@ setup() {
 }
 
 @test "uninstall --force removes unprefixed slots when manifest lists them" {
-  printf '%s\n' demo other > "$HOME/.config/kstack/installed-skills"
+  printf '%s\n' demo other > "$HOME/.config/kstack/manifest/skills"
   mkdir -p "$HOME/.claude/skills/demo" "$HOME/.claude/skills/other"
   run "$UNINSTALL" --force
   [ "$status" -eq 0 ]
@@ -57,7 +58,7 @@ setup() {
 }
 
 @test "uninstall leaves kstack-* dirs alone when they are not in the manifest" {
-  printf '%s\n' demo > "$HOME/.config/kstack/installed-skills"
+  printf '%s\n' demo > "$HOME/.config/kstack/manifest/skills"
   mkdir -p "$HOME/.claude/skills/demo"
   run "$UNINSTALL" --force
   [ "$status" -eq 0 ]
@@ -67,7 +68,7 @@ setup() {
 }
 
 @test "uninstall with empty manifest removes only ROOT_DIR" {
-  : > "$HOME/.config/kstack/installed-skills"
+  : > "$HOME/.config/kstack/manifest/skills"
   run "$UNINSTALL" --force
   [ "$status" -eq 0 ]
   [ -d "$HOME/.claude/skills/kstack-demo" ]
@@ -137,16 +138,16 @@ setup() {
 @test "uninstall --force in local layout removes .kstack and scoped skill slots" {
   # Stage a fake local install: <project>/.kstack/{bin,lib,upstream/.git,…}.
   # Mode detection only needs upstream/.git to exist; slot targets are read
-  # from the installed-skills manifest.
+  # from manifest/skills.
   PROJECT="$TMPDIR_TEST/proj"
   ROOT="$PROJECT/.kstack"
-  mkdir -p "$ROOT/bin" "$ROOT/lib" "$ROOT/upstream"
+  mkdir -p "$ROOT/bin" "$ROOT/lib" "$ROOT/upstream" "$ROOT/manifest"
   git init --quiet "$ROOT/upstream"
   cp "$SRC_ROOT/bin/uninstall" "$ROOT/bin/uninstall"
   cp "$SRC_ROOT/lib/agents.sh" "$ROOT/lib/agents.sh"
   cp "$SRC_ROOT/lib/manifest.sh" "$ROOT/lib/manifest.sh"
   chmod +x "$ROOT/bin/uninstall"
-  printf '%s\n' demo > "$ROOT/installed-skills"
+  printf '%s\n' demo > "$ROOT/manifest/skills"
 
   mkdir -p "$PROJECT/.claude/skills/demo" "$PROJECT/.claude/skills/user-own"
   echo "kstack" > "$PROJECT/.claude/skills/demo/SKILL.md"

@@ -20,16 +20,18 @@ setup() {
 
   # Global-mode install layout: check-update lives at $HOME/.config/kstack/bin,
   # libs alongside at $HOME/.config/kstack/lib.
-  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/cache" "$HOME/.config/kstack/lib"
+  mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/cache" \
+           "$HOME/.config/kstack/lib" "$HOME/.config/kstack/manifest"
   cp "$SRC_ROOT/bin/check-update" "$HOME/.config/kstack/bin/check-update"
   cp "$SRC_ROOT/lib/cache.sh" "$HOME/.config/kstack/lib/cache.sh"
+  cp "$SRC_ROOT/lib/manifest.sh" "$HOME/.config/kstack/lib/manifest.sh"
   cp "$SRC_ROOT/lib/update-check.sh" "$HOME/.config/kstack/lib/update-check.sh"
   chmod +x "$HOME/.config/kstack/bin/check-update"
   CACHE_FILE="$HOME/.config/kstack/cache/update.json"
   CHECK="$HOME/.config/kstack/bin/check-update"
 
   # Set installed version.
-  echo "v1.0.0" > "$HOME/.config/kstack/install.conf"
+  echo "v1.0.0" > "$HOME/.config/kstack/manifest/version"
 }
 
 # stub_git is provided by test_helper.bash.
@@ -104,8 +106,8 @@ EOF
   [[ "$output" == *"kstack v5.0.0 is available"* ]]
 }
 
-@test "check-update with no install.conf exits silently (bail)" {
-  rm -f "$HOME/.config/kstack/install.conf"
+@test "check-update with no manifest/version exits silently (bail)" {
+  rm -f "$HOME/.config/kstack/manifest/version"
   stub_git
   export MOCK_TAGS="v9.0.0"
   run "$CHECK"
@@ -114,7 +116,7 @@ EOF
 }
 
 @test "check-update with installed=main exits silently (pre-release)" {
-  echo "main" > "$HOME/.config/kstack/install.conf"
+  echo "main" > "$HOME/.config/kstack/manifest/version"
   stub_git
   export MOCK_TAGS="v9.0.0"
   run "$CHECK"

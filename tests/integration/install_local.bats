@@ -73,8 +73,8 @@ EOF
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
   [ -d "$PROJECT/.kstack/upstream/.git" ]
-  [ -f "$PROJECT/.kstack/install.conf" ]
-  run cat "$PROJECT/.kstack/install.conf"
+  [ -f "$PROJECT/.kstack/manifest/version" ]
+  run cat "$PROJECT/.kstack/manifest/version"
   [ "$output" = "v1.2.3" ]
 }
 

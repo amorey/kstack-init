@@ -25,6 +25,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # shellcheck source=../lib/cache.sh
 . "$SCRIPT_DIR/../lib/cache.sh"
+# shellcheck source=../lib/manifest.sh
+. "$SCRIPT_DIR/../lib/manifest.sh"
 # shellcheck source=../lib/update-check.sh
 . "$SCRIPT_DIR/../lib/update-check.sh"
 # shellcheck source=../lib/response.sh

@@ -13,33 +13,37 @@
 # limitations under the License.
 
 # shellcheck shell=bash
-# kstack installed-skills manifest — paired read/write helpers shared by
-# scripts/install (write at install time, read for diff-based prune) and
-# src/bin/uninstall (read to know which slots to delete).
+# kstack install manifest — paired read/write helpers for the per-install
+# manifest dir at $root/manifest/. Files are plain text, one "fact" each:
 #
-# Format: one slot name per line, no header. Consumers treat blank lines
-# as absent. Writers sort the output so diffs stay stable across installs.
+#   version  — single line: installed version (tag or branch name), empty
+#              when unknown / detached HEAD.
+#   skills   — one rendered slot name per line, sorted. Lets re-installs
+#              diff against the new set to prune orphans, and lets
+#              src/bin/uninstall know which slots belong to kstack.
 #
 # Source this file; do not execute it.
 
-# manifest::path $root — absolute path of the manifest inside an install root.
-manifest::path() { printf '%s\n' "$1/installed-skills"; }
-
-# manifest::read $root — print each slot (one per line) to stdout. Silent
-# when the manifest is missing so callers can treat it as an empty set.
-manifest::read() {
-  local f
-  f="$(manifest::path "$1")"
-  [ -f "$f" ] || return 0
-  cat -- "$f"
+manifest::read_version() {
+  cat -- "$1/manifest/version" 2>/dev/null || true
 }
 
-# manifest::write $root $slot_names... — write one slot per line, sorted.
+manifest::write_version() {
+  mkdir -p "$1/manifest"
+  printf '%s\n' "$2" > "$1/manifest/version"
+}
+
+manifest::read_skills() {
+  cat -- "$1/manifest/skills" 2>/dev/null || true
+}
+
+# manifest::write_skills $root $slot_names... — one slot per line, sorted.
 # Each argument is a single slot name (already-prefixed).
-manifest::write() {
+manifest::write_skills() {
   local root="$1"; shift
+  mkdir -p "$root/manifest"
   local slot
   for slot in "$@"; do
     [ -n "$slot" ] && printf '%s\n' "$slot"
-  done | LC_ALL=C sort > "$(manifest::path "$root")"
+  done | LC_ALL=C sort > "$root/manifest/skills"
 }

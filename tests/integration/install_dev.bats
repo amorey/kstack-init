@@ -115,31 +115,31 @@ EOF
   [ -f "$FAKE_ROOT/.kstack/lib/cache.sh" ]
 }
 
-@test "install writes install.conf under .kstack" {
+@test "install writes manifest/version under .kstack" {
   run "$RUN_INSTALL" --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -f "$FAKE_ROOT/.kstack/install.conf" ]
+  [ -f "$FAKE_ROOT/.kstack/manifest/version" ]
 }
 
-@test "install writes installed-skills with one sorted slot per line (default prefix)" {
+@test "install writes manifest/skills with one sorted slot per line (default prefix)" {
   run "$RUN_INSTALL" --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -f "$FAKE_ROOT/.kstack/installed-skills" ]
-  run cat "$FAKE_ROOT/.kstack/installed-skills"
+  [ -f "$FAKE_ROOT/.kstack/manifest/skills" ]
+  run cat "$FAKE_ROOT/.kstack/manifest/skills"
   [ "$output" = "demo" ]
 }
 
-@test "install --prefix= writes unprefixed slot names to installed-skills" {
+@test "install --prefix= writes unprefixed slot names to manifest/skills" {
   run "$RUN_INSTALL" --agent claude --prefix= --quiet
   [ "$status" -eq 0 ]
-  run cat "$FAKE_ROOT/.kstack/installed-skills"
+  run cat "$FAKE_ROOT/.kstack/manifest/skills"
   [ "$output" = "demo" ]
 }
 
-@test "install --prefix=foo- writes foo-prefixed slot names to installed-skills" {
+@test "install --prefix=foo- writes foo-prefixed slot names to manifest/skills" {
   run "$RUN_INSTALL" --agent claude --prefix=foo- --quiet
   [ "$status" -eq 0 ]
-  run cat "$FAKE_ROOT/.kstack/installed-skills"
+  run cat "$FAKE_ROOT/.kstack/manifest/skills"
   [ "$output" = "foo-demo" ]
 }
 

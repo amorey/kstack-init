@@ -75,13 +75,10 @@ KSTACK_REMOTE_URL="${KSTACK_REMOTE_URL:-https://github.com/kubetail-org/kstack.g
 QUIET=0
 log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
 
-# write_install_conf $root $version
-write_install_conf() { printf '%s\n' "$2" > "$1/install.conf"; }
-
 # ensure_src_checkout $upstream_dir $root_dir
 #   Clones (first time) or fetches+checks-out (subsequent runs) the canonical
-#   upstream at the latest tagged release into $upstream_dir, and writes
-#   $root_dir/install.conf with the resolved tag. Pre-release fallback: if no
+#   upstream at the latest tagged release into $upstream_dir, and writes the
+#   resolved tag to $root_dir/manifest/version. Pre-release fallback: if no
 #   `v*` tags exist anywhere, use `main` with a visible warning.
 ensure_src_checkout() {
   local upstream="$1" root="$2"
@@ -110,7 +107,7 @@ ensure_src_checkout() {
     fi
     log "   📥 Upstream   → $upstream @ $tag (cloned)"
   fi
-  write_install_conf "$root" "$tag"
+  manifest::write_version "$root" "$tag"
 }
 
 # render_skill $skill $skill_name $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $entrypoint_partial
@@ -316,14 +313,14 @@ copy_lib() {
   prune_orphans "$dst" '*/' "${keep# }" "lib/"
 }
 
-# write_local_install_conf $root $src — record tag or branch; empty on detached HEAD.
-write_local_install_conf() {
+# write_dev_version $root $src — record tag or branch; empty on detached HEAD.
+write_dev_version() {
   local version
   version="$(git -C "$2" describe --tags --exact-match HEAD 2>/dev/null \
           || git -C "$2" rev-parse --abbrev-ref HEAD 2>/dev/null \
           || true)"
   [ "$version" = "HEAD" ] && version=""
-  write_install_conf "$1" "$version"
+  manifest::write_version "$1" "$version"
 }
 
 main() {
@@ -449,16 +446,16 @@ main() {
   copy_schemas "$SRC_ROOT/schemas" "$ROOT_DIR/schemas"
   log "   📦 Helpers    → $ROOT_DIR"
 
-  # Managed modes have install.conf already written by ensure_src_checkout;
+  # Managed modes already wrote manifest/version via ensure_src_checkout;
   # dev mode stamps it from the current git checkout.
-  [ "$MODE" = dev ] && write_local_install_conf "$ROOT_DIR" "$REPO_ROOT"
+  [ "$MODE" = dev ] && write_dev_version "$ROOT_DIR" "$REPO_ROOT"
 
   # Slot names are uniform across agents ($PREFIX + skill), so the prev→new
   # diff is computed once and each agent prunes the same stale set.
   NEW_SLOTS=""
   for s in $SKILL_NAMES; do NEW_SLOTS="$NEW_SLOTS ${PREFIX}${s}"; done
   STALE_SLOTS=""
-  for p in $(manifest::read "$ROOT_DIR"); do
+  for p in $(manifest::read_skills "$ROOT_DIR"); do
     case " $NEW_SLOTS " in
       *" $p "*) ;;
       *) STALE_SLOTS="$STALE_SLOTS $p" ;;
@@ -475,7 +472,7 @@ main() {
   done
 
   # shellcheck disable=SC2086 # intentional word-splitting — each token is a slot.
-  manifest::write "$ROOT_DIR" $NEW_SLOTS
+  manifest::write_skills "$ROOT_DIR" $NEW_SLOTS
 
   log ""
   log "✅ kstack installed. Start a session with your agent to use the skills."

@@ -64,11 +64,11 @@ EOF
   export KSTACK_REMOTE_URL="$BARE"
 }
 
-@test "install --global clones bare repo at latest tag and writes install.conf" {
+@test "install --global clones bare repo at latest tag and writes manifest/version" {
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -f "$HOME/.config/kstack/install.conf" ]
-  run cat "$HOME/.config/kstack/install.conf"
+  [ -f "$HOME/.config/kstack/manifest/version" ]
+  run cat "$HOME/.config/kstack/manifest/version"
   [ "$output" = "v1.2.3" ]
 }
 
