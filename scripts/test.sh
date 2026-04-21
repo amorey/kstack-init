@@ -87,7 +87,10 @@ fi
 
 BATS_ARGS="--formatter tap --timing"
 if [ "$JOBS" -gt 1 ]; then
-  BATS_ARGS="$BATS_ARGS --jobs $JOBS"
+  # --no-parallelize-within-files: across-file parallelism is enough for our
+  # workload (23 files) and avoids bats's flock/shlock dependency, which Git
+  # Bash on Windows doesn't ship.
+  BATS_ARGS="$BATS_ARGS --jobs $JOBS --no-parallelize-within-files"
 fi
 
 # shellcheck disable=SC2086  # intentional word-split on BATS_ARGS
