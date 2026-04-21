@@ -7,4 +7,86 @@ description: NetworkPolicy, Service, Ingress, Gateway API, DNS and encryption ch
 
 {{GLOBAL_FLAGS}}
 
-<!-- Body populated in a later TODO item. -->
+## Purpose
+
+Read-only network posture audit across independent workflows. Never mutates cluster state. The snapshot is bounded so re-emitting through the model is cheap; full per-resource detail stays in the cached JSON for drill-in.
+
+## Arguments
+
+This skill takes no positional arguments, but free-text after the command (e.g. `/audit-network just check services`) is allowed — treat it as instructions for how to customize the execution. Do **not** forward the bare text to `scripts/main` (it only understands flags); strip positional tokens and pass through only `--refresh` / `--ttl`. After the snapshot envelope renders, use the instructions to decide which findings to highlight, filter, or re-run. Only the unknown-flag rule from Global flags applies here (tokens starting with `-`); bare text must not trigger an error.
+
+## Skill flags
+
+- `--refresh` — Fetch most recent data, bypassing and refreshing the cache. Default: `false`.
+- `--ttl <duration>` — Only update the cache if older than this (kubectl-style: `5m`, `1h`, `24h`). Default: `15m`. Ignored when `--refresh` is set.
+
+## Workflow
+
+The entrypoint dispatches to `{{SKILL_DIR}}/scripts/main`, which fetches `namespaces`, `networkpolicies`, `services`, `endpoints`, and `pods` (caching raw JSON to disk per-context) and runs two independent audit workflows, emitting the combined results as a `render: verbatim` envelope. Per the entrypoint contract, print the envelope's `content` verbatim and end the turn.
+
+The envelope carries `agent_context` as a compact JSON string: `{"cache_dir":"<dir>","context":"<ctx>"}`. Parse it (don't display it) and remember `cache_dir` for follow-ups.
+
+### Workflow 1: Network Policies
+
+Checks:
+- **Namespaces without default-deny:** Any user namespace (excluding `kube-system`, `kube-public`, `kube-node-lease`) that has no NetworkPolicy with an empty `podSelector` (which acts as a default-deny).
+- **Unprotected pods:** Pods not selected by any NetworkPolicy in their namespace.
+
+Output shape:
+
+    Network Policies:
+      2 namespace(s) without default-deny: default, app-ns
+      3 pod(s) not selected by any NetworkPolicy: app-ns/orphan-pod, ...
+
+Or when clean:
+
+    Network Policies:
+      No issues found.
+
+### Workflow 2: Services
+
+Checks:
+- **No ready endpoints:** Services (excluding `ExternalName` and `kube-system`) whose Endpoints object has no ready addresses.
+- **Selector matching zero pods:** Services whose label selector matches no pods in the same namespace.
+
+Output shape:
+
+    Services:
+      1 service(s) with no ready endpoints: app-ns/orphan-svc
+      1 service(s) with selector matching zero pods: app-ns/ghost-svc
+
+Or when clean:
+
+    Services:
+      No issues found.
+
+### Re-invocation
+
+Each workflow has a standalone script the agent can invoke directly through the entrypoint. Use these when the user asks to re-run only one audit:
+
+- `{{SKILL_DIR}}/scripts/network-policies` — accepts `--refresh` / `--ttl`.
+- `{{SKILL_DIR}}/scripts/services` — accepts `--refresh` / `--ttl`.
+
+Both emit the same response envelope shape as `main` (scoped to their one workflow).
+
+## Follow-ups on the cached snapshot
+
+When the user asks to drill into findings — e.g. "which pods are unprotected?" or "show me the services with no endpoints" — do **not** re-run `/audit-network`. Instead:
+
+1. Read the JSON files from the `cache_dir` carried on the previous turn's `agent_context` (`namespaces.json`, `networkpolicies.json`, `services.json`, `endpoints.json`, `pods.json`).
+2. Use `jq` to answer — list resources, filter by namespace/label, or extract the specific field needed.
+3. When rendering a table, pick sensible columns and align with `column -t`.
+
+If the user says "refresh" / "re-check", re-invoke the skill with `--refresh`.
+
+## Limitations (current version)
+
+This initial implementation covers NetworkPolicy and Service audits. The following are **not yet available** — do not hallucinate them:
+
+- Ingress / Gateway API checks (hostname collisions, missing TLS, dangling backends)
+- DNS checks (CoreDNS health, NXDOMAIN rates, stub domains)
+- Encryption / mTLS coverage (Istio, Linkerd, Cilium mesh detection)
+- `--graph` flag (service connectivity diagram)
+- `--probe` flag (active reachability testing)
+- `--namespace` scoping
+- `--json` structured output

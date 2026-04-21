@@ -43,6 +43,10 @@ exec shellcheck --severity=warning --external-sources \
   src/skills/audit-outdated/scripts/version-skew \
   src/skills/audit-outdated/scripts/deprecated-apis \
   src/skills/audit-outdated/scripts/lib/*.sh \
+  src/skills/audit-network/scripts/main \
+  src/skills/audit-network/scripts/network-policies \
+  src/skills/audit-network/scripts/services \
+  src/skills/audit-network/scripts/lib/*.sh \
   tests/test_helper.bash \
   tests/e2e/setup_suite.bash \
   tests/e2e/lib/*.sh \
