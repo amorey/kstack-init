@@ -87,9 +87,12 @@ fi
 
 BATS_ARGS="--formatter tap --timing"
 if [ "$JOBS" -gt 1 ]; then
-  # --no-parallelize-within-files: across-file parallelism is enough for our
-  # workload (23 files) and avoids bats's flock/shlock dependency, which Git
-  # Bash on Windows doesn't ship.
+  # Across-file parallelism is enough for our workload (23 files) and avoids
+  # bats's flock/shlock dependency for within-file parallelism, which Git Bash
+  # on Windows doesn't ship. Set the env var in addition to the flag because
+  # the flag alone isn't reliably honored on the npm-packaged bats we install
+  # on Windows runners.
+  export BATS_NO_PARALLELIZE_WITHIN_FILE=true
   BATS_ARGS="$BATS_ARGS --jobs $JOBS --no-parallelize-within-files"
 fi
 
