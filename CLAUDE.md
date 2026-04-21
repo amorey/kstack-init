@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 kstack is a **skill pack** (not an app) distributed to Claude Code and other agent CLIs. The shipped artifacts are `SKILL.md` files plus a handful of helper shell scripts in `src/bin/`. There is no runtime service — everything is POSIX shell rendered/executed at install time or inside an agent session.
 
+Shipped shell (`scripts/install`, everything under `src/bin/` and `src/lib/`, plus any skill `scripts/main`) must run on **bash 3.2+** — that's what macOS's `/usr/bin/bash` is, and we don't assume users have a newer bash on PATH. Concretely: no `declare -A`, no `${var,,}`/`${var^^}`, no `mapfile`/`readarray`, no `[[ =~ ]]` BASH_REMATCH patterns that rely on 4.x fixes, and no `&>` redirection. The big footgun is `set -u` + empty arrays: `"${arr[@]}"` raises *unbound variable* in 3.2 when `arr=()`. Either guard iteration with `[ ${#arr[@]} -eq 0 ] && continue`, or use `${arr[@]+"${arr[@]}"}` at the expansion site. Dev-only scripts (`scripts/*.sh`, `tests/**`) may assume a newer bash since they only run on CI/contributor machines.
+
 ## Layout
 
 Split is: **`src/` = installer payload (what gets copied/rendered into an install root); everything else = dev infra.**

@@ -115,6 +115,9 @@ main() {
       skills_dir="$(agent_skills_dir_local "$PROJECT_DIR" "$h")"
     fi
     [ -d "$skills_dir" ] || continue
+    # Guard: bash 3.2 (macOS default) treats "${SLOTS[@]}" on an empty array
+    # as unbound under `set -u`.
+    [ ${#SLOTS[@]} -eq 0 ] && continue
     for slot in "${SLOTS[@]}"; do
       entry="$skills_dir/$slot"
       [ -e "$entry" ] || [ -L "$entry" ] || continue
