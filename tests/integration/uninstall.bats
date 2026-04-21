@@ -18,11 +18,14 @@ setup() {
   load '../test_helper.bash'
   common_setup
 
-  # Stage a fake global install: config dir, lib, bin, some kstack-* skill dirs.
+  # Stage a fake global install: config dir, lib, bin, an installed-skills
+  # manifest, and the slot dirs the manifest references.
   mkdir -p "$HOME/.config/kstack/bin" "$HOME/.config/kstack/lib"
   cp "$SRC_ROOT/bin/uninstall" "$HOME/.config/kstack/bin/uninstall"
   cp "$SRC_ROOT/lib/agents.sh" "$HOME/.config/kstack/lib/agents.sh"
+  cp "$SRC_ROOT/lib/manifest.sh" "$HOME/.config/kstack/lib/manifest.sh"
   chmod +x "$HOME/.config/kstack/bin/uninstall"
+  printf '%s\n' kstack-demo kstack-other > "$HOME/.config/kstack/installed-skills"
 
   mkdir -p "$HOME/.claude/skills/kstack-demo" "$HOME/.claude/skills/kstack-other"
   mkdir -p "$HOME/.claude/skills/non-kstack"  # must NOT be removed
@@ -31,12 +34,43 @@ setup() {
   UNINSTALL="$HOME/.config/kstack/bin/uninstall"
 }
 
-@test "uninstall --force removes all kstack-* skill dirs and config dir" {
+@test "uninstall --force removes every manifest-listed slot dir and config dir" {
   run "$UNINSTALL" --force
   [ "$status" -eq 0 ]
   [ ! -e "$HOME/.claude/skills/kstack-demo" ]
   [ ! -e "$HOME/.claude/skills/kstack-other" ]
   [ ! -e "$HOME/.codex/skills/kstack-demo" ]
+  [ ! -e "$HOME/.config/kstack" ]
+}
+
+@test "uninstall --force removes unprefixed slots when manifest lists them" {
+  printf '%s\n' demo other > "$HOME/.config/kstack/installed-skills"
+  mkdir -p "$HOME/.claude/skills/demo" "$HOME/.claude/skills/other"
+  run "$UNINSTALL" --force
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.claude/skills/demo" ]
+  [ ! -e "$HOME/.claude/skills/other" ]
+  # Dirs that happen to share the old prefix are NOT removed — they weren't
+  # in the manifest, so they belong to someone else.
+  [ -e "$HOME/.claude/skills/kstack-demo" ]
+  [ ! -e "$HOME/.config/kstack" ]
+}
+
+@test "uninstall leaves kstack-* dirs alone when they are not in the manifest" {
+  printf '%s\n' demo > "$HOME/.config/kstack/installed-skills"
+  mkdir -p "$HOME/.claude/skills/demo"
+  run "$UNINSTALL" --force
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.claude/skills/demo" ]
+  [ -d "$HOME/.claude/skills/kstack-demo" ]
+  [ -d "$HOME/.claude/skills/kstack-other" ]
+}
+
+@test "uninstall with empty manifest removes only ROOT_DIR" {
+  : > "$HOME/.config/kstack/installed-skills"
+  run "$UNINSTALL" --force
+  [ "$status" -eq 0 ]
+  [ -d "$HOME/.claude/skills/kstack-demo" ]
   [ ! -e "$HOME/.config/kstack" ]
 }
 
@@ -80,6 +114,7 @@ setup() {
   mkdir -p "$elsewhere" "$TMPDIR_TEST/elsewhere/lib"
   cp "$SRC_ROOT/bin/uninstall" "$elsewhere/uninstall"
   cp "$SRC_ROOT/lib/agents.sh" "$TMPDIR_TEST/elsewhere/lib/agents.sh"
+  cp "$SRC_ROOT/lib/manifest.sh" "$TMPDIR_TEST/elsewhere/lib/manifest.sh"
   chmod +x "$elsewhere/uninstall"
 
   run "$elsewhere/uninstall" --force
@@ -101,24 +136,26 @@ setup() {
 
 @test "uninstall --force in local layout removes .kstack and scoped skill slots" {
   # Stage a fake local install: <project>/.kstack/{bin,lib,upstream/.git,…}.
-  # Mode detection only needs upstream/.git to exist; slot pruning uses the
-  # same kstack-* glob as global mode, so no source enumeration required.
+  # Mode detection only needs upstream/.git to exist; slot targets are read
+  # from the installed-skills manifest.
   PROJECT="$TMPDIR_TEST/proj"
   ROOT="$PROJECT/.kstack"
   mkdir -p "$ROOT/bin" "$ROOT/lib" "$ROOT/upstream"
   git init --quiet "$ROOT/upstream"
   cp "$SRC_ROOT/bin/uninstall" "$ROOT/bin/uninstall"
   cp "$SRC_ROOT/lib/agents.sh" "$ROOT/lib/agents.sh"
+  cp "$SRC_ROOT/lib/manifest.sh" "$ROOT/lib/manifest.sh"
   chmod +x "$ROOT/bin/uninstall"
+  printf '%s\n' demo > "$ROOT/installed-skills"
 
-  mkdir -p "$PROJECT/.claude/skills/kstack-demo" "$PROJECT/.claude/skills/user-own"
-  echo "kstack" > "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  mkdir -p "$PROJECT/.claude/skills/demo" "$PROJECT/.claude/skills/user-own"
+  echo "kstack" > "$PROJECT/.claude/skills/demo/SKILL.md"
   echo "mine"   > "$PROJECT/.claude/skills/user-own/SKILL.md"
 
   run "$ROOT/bin/uninstall" --force
   [ "$status" -eq 0 ]
   [ ! -e "$ROOT" ]
-  [ ! -e "$PROJECT/.claude/skills/kstack-demo" ]
+  [ ! -e "$PROJECT/.claude/skills/demo" ]
   # User-authored skill in the same dir survives.
   [ -f "$PROJECT/.claude/skills/user-own/SKILL.md" ]
 }

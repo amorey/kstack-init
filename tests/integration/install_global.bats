@@ -34,6 +34,7 @@ setup() {
     # Install script at scripts/install — mirrors the real repo layout.
     cp "$REPO_ROOT/scripts/install" scripts/install
     cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
+    cp "$SRC_ROOT/lib/manifest.sh" src/lib/manifest.sh
     cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
     cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
@@ -71,35 +72,35 @@ EOF
   [ "$output" = "v1.2.3" ]
 }
 
-@test "install --global renders skills into \$HOME/.claude/skills/kstack-<name>" {
+@test "install --global renders skills into \$HOME/.claude/skills/<name> (unprefixed by default)" {
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
-  assert_file_exists "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  assert_file_exists "$HOME/.claude/skills/demo/SKILL.md"
   # Template must reference the global install root and bin dir.
-  run grep -F "install_root: $HOME/.config/kstack" "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "install_root: $HOME/.config/kstack" "$HOME/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
-  run grep -F "bin_dir: $HOME/.config/kstack/bin" "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "bin_dir: $HOME/.config/kstack/bin" "$HOME/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
 @test "install --global substitutes SKILL_DIR to the rendered slot path" {
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "skill_dir: $HOME/.claude/skills/kstack-demo" "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "skill_dir: $HOME/.claude/skills/demo" "$HOME/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
 @test "install --global substitutes SKILL_NAME to the prefixed slot name" {
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "name: kstack-demo" "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "name: demo" "$HOME/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
 @test "install --global copies skills/<name>/scripts/ into rendered slot" {
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -x "$HOME/.claude/skills/kstack-demo/scripts/snapshot" ]
+  [ -x "$HOME/.claude/skills/demo/scripts/snapshot" ]
 }
 
 @test "install --global copies bin/ helpers to \$HOME/.config/kstack/bin" {
@@ -121,18 +122,17 @@ EOF
   # Second run — should take the "Updating" branch, still succeeds.
   run "$RUN_INSTALL" --global --agent claude --quiet
   [ "$status" -eq 0 ]
-  assert_file_exists "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  assert_file_exists "$HOME/.claude/skills/demo/SKILL.md"
 }
 
-@test "install --global prunes orphan kstack-* skill slot" {
-  run "$RUN_INSTALL" --global --agent claude --quiet
+@test "install --global reinstall with different prefix prunes prior-prefix slots" {
+  run "$RUN_INSTALL" --global --agent claude --prefix=old- --quiet
   [ "$status" -eq 0 ]
-  mkdir -p "$HOME/.claude/skills/kstack-ghost"
-  echo "stale" > "$HOME/.claude/skills/kstack-ghost/SKILL.md"
-  run "$RUN_INSTALL" --global --agent claude --quiet
+  assert_file_exists "$HOME/.claude/skills/old-demo/SKILL.md"
+  run "$RUN_INSTALL" --global --agent claude --prefix=new- --quiet
   [ "$status" -eq 0 ]
-  [ ! -e "$HOME/.claude/skills/kstack-ghost" ]
-  assert_file_exists "$HOME/.claude/skills/kstack-demo/SKILL.md"
+  [ ! -e "$HOME/.claude/skills/old-demo" ]
+  assert_file_exists "$HOME/.claude/skills/new-demo/SKILL.md"
 }
 
 @test "install --global preserves non-kstack skill slot in shared skills dir" {

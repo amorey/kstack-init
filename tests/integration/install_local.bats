@@ -15,7 +15,8 @@
 # limitations under the License.
 
 # install --local mode: clones a kstack-owned upstream into $PWD/.kstack/
-# and renders skills into $PWD/.<agent>/skills/kstack-<name>/.
+# and renders skills into $PWD/.<agent>/skills/<name>/ (bare by default,
+# namespaced when --prefix is passed).
 
 setup() {
   load '../test_helper.bash'
@@ -35,6 +36,7 @@ setup() {
     mkdir -p scripts src/bin src/lib src/skills/demo/scripts src/skills/_partials
     cp "$REPO_ROOT/scripts/install" scripts/install
     cp "$SRC_ROOT/lib/agents.sh" src/lib/agents.sh
+    cp "$SRC_ROOT/lib/manifest.sh" src/lib/manifest.sh
     cp "$SRC_ROOT/lib/cache.sh" src/lib/cache.sh
     cp "$FIXTURES_DIR/skills/demo/SKILL.md.tmpl" src/skills/demo/SKILL.md.tmpl
     cp "$FIXTURES_DIR/skills/_partials/global-flags.md" src/skills/_partials/global-flags.md
@@ -76,22 +78,21 @@ EOF
   [ "$output" = "v1.2.3" ]
 }
 
-@test "install --local renders skills into \$PWD/.claude/skills/kstack-<name>" {
+@test "install --local renders skills into \$PWD/.claude/skills/<name> (unprefixed by default)" {
   cd "$PROJECT"
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  assert_file_exists "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
-  # Bare-name slots are never rendered — every mode uses the kstack- prefix.
-  [ ! -e "$PROJECT/.claude/skills/demo" ]
+  assert_file_exists "$PROJECT/.claude/skills/demo/SKILL.md"
+  [ ! -e "$PROJECT/.claude/skills/kstack-demo" ]
 }
 
 @test "install --local substitutes local install root and bin dir into template" {
   cd "$PROJECT"
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "install_root: $PROJECT/.kstack" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "install_root: $PROJECT/.kstack" "$PROJECT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
-  run grep -F "bin_dir: $PROJECT/.kstack/bin" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "bin_dir: $PROJECT/.kstack/bin" "$PROJECT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
@@ -99,15 +100,15 @@ EOF
   cd "$PROJECT"
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "skill_dir: $PROJECT/.claude/skills/kstack-demo" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "skill_dir: $PROJECT/.claude/skills/demo" "$PROJECT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
-@test "install --local substitutes SKILL_NAME with the kstack- prefix" {
+@test "install --local substitutes SKILL_NAME with the bare skill name" {
   cd "$PROJECT"
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  run grep -F "name: kstack-demo" "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  run grep -F "name: demo" "$PROJECT/.claude/skills/demo/SKILL.md"
   [ "$status" -eq 0 ]
 }
 
@@ -115,7 +116,7 @@ EOF
   cd "$PROJECT"
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  [ -x "$PROJECT/.claude/skills/kstack-demo/scripts/snapshot" ]
+  [ -x "$PROJECT/.claude/skills/demo/scripts/snapshot" ]
 }
 
 @test "install --local copies bin/ helpers under \$PWD/.kstack/bin" {
@@ -139,7 +140,7 @@ EOF
   [ "$status" -eq 0 ]
   run "$RUN_INSTALL" --local --agent claude --quiet
   [ "$status" -eq 0 ]
-  assert_file_exists "$PROJECT/.claude/skills/kstack-demo/SKILL.md"
+  assert_file_exists "$PROJECT/.claude/skills/demo/SKILL.md"
 }
 
 @test "install --local preserves non-kstack skill slot in the shared skills dir" {

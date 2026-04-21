@@ -33,6 +33,11 @@
 #               skills into $PWD/.<agent>/skills/. Overwrites any existing
 #               .kstack/ in the current directory.
 #
+# Extra flags (forwarded verbatim to scripts/install):
+#   --prefix=<p>   Namespace every slot as <p><skill>/ (default: bare names).
+#                  Example: `curl … | bash -s -- --prefix=kstack-`.
+#   --agent <n>    Limit to one agent (claude, codex, …).
+#
 # This script is duplicated verbatim in the kubetail-website repo's
 # static assets. When editing this file, update both copies.
 set -eu

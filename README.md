@@ -2,8 +2,6 @@
 
 *Skill pack for Claude Code that helps you monitor your K8s clusters superintelligently*
 
-<img width="350" alt="kstack" src="assets/kstack.svg" />
-
 <a href="https://discord.gg/CmsmWAVkvX"><img src="https://img.shields.io/discord/1212031524216770650?logo=Discord&style=flat-square&logoColor=FFFFFF&labelColor=5B65F0&label=Discord&color=64B73A"></a>
 [![Slack](https://img.shields.io/badge/Slack-kubetail-364954?logo=slack&labelColor=4D1C51)](https://kubernetes.slack.com/archives/C08SHG1GR37)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
@@ -12,6 +10,8 @@
 English | [简体中文](.github/README.zh-CN.md) | [日本語](.github/README.ja.md) | [한국어](.github/README.ko.md) | [Deutsch](.github/README.de.md) | [Español](.github/README.es.md) | [Português](.github/README.pt-BR.md) | [Français](.github/README.fr.md)
 
 ## Introduction
+
+<img width="350" alt="kstack" src="assets/kstack.svg" />
 
 **Kstack** is a skill pack for Claude Code that helps you perform monitoring, troubleshooting and auditing tasks on your K8s clusters in a smart and efficient way. Alongside standard tools like `kubectl`, kstack uses [`kubetail`](https://github.com/kubetail-org/kubetail) to process container logs remotely at the source before sending it back to Claude for analysis which makes monitoring with Claude faster and more token efficient. Kstack also detects the services running in your cluster and uses their specialized tooling when necessary (e.g. Argo, Cilium) which makes Claude more capable.
 
@@ -54,13 +54,15 @@ mkdir myproject && cd myproject
 curl -sS https://kubestack.xyz/install.sh | bash -s -- --local
 ```
 
-The bootstrap script installs the kstack skills into your global/local Claude skills directory (e.g. `~/.claude/skills`), prefixing the skill names with `kstack-`. It also detects other available agents (e.g. Codex, OpenCode) and installs the skills into their skills directories as well. Once installed, the skills are available in any project session:
+The bootstrap script installs the kstack skills into your global/local Claude skills directory. It also detects other available agents (e.g. Codex, OpenCode) and installs into their skills directories as well. Once installed, the skills are available in any project session:
 
 ```console
 ───────────────────────────────────
-> /kstack-cluster-status
+> /cluster-status
 ───────────────────────────────────
 ```
+
+If the bare slash commands would collide with your own skills, you can namespace the install with `--prefix=<p>` to render every slot as `<p><skill>` (e.g. `curl -sS https://kubestack.xyz/install.sh | bash -s -- --prefix=kstack-` yields `/kstack-cluster-status`).
 
 Kstack uses your local `kubeconfig` file for authentication so it will be able to use your RBAC permissions to perform actions on your behalf. If it runs into permissions problems, it will let you know.
 
@@ -68,17 +70,17 @@ Kstack uses your local `kubeconfig` file for authentication so it will be able t
 
 Kstack works with any AI agent that supports skills, not just Claude. The curl bootstrap auto-detects which agent CLIs are on your `PATH` and installs for each. You can target a specific agent with `--agent <name>`:
 
-| Agent            | Flag               | Global install path                   |
-|------------------|--------------------|---------------------------------------|
-| OpenAI Codex CLI | `--agent codex`    | `~/.codex/skills/kstack-*/`           |
-| OpenCode         | `--agent opencode` | `~/.config/opencode/skills/kstack-*/` |
-| Cursor           | `--agent cursor`   | `~/.cursor/skills/kstack-*/`          |
-| Factory Droid    | `--agent factory`  | `~/.factory/skills/kstack-*/`         |
-| Slate            | `--agent slate`    | `~/.slate/skills/kstack-*/`           |
-| Kiro             | `--agent kiro`     | `~/.kiro/skills/kstack-*/`            |
-| Hermes           | `--agent hermes`   | `~/.hermes/skills/kstack-*/`          |
+| Agent            | Flag               | Global install path            |
+|------------------|--------------------|--------------------------------|
+| OpenAI Codex CLI | `--agent codex`    | `~/.codex/skills/`             |
+| OpenCode         | `--agent opencode` | `~/.config/opencode/skills/`   |
+| Cursor           | `--agent cursor`   | `~/.cursor/skills/`            |
+| Factory Droid    | `--agent factory`  | `~/.factory/skills/`           |
+| Slate            | `--agent slate`    | `~/.slate/skills/`             |
+| Kiro             | `--agent kiro`     | `~/.kiro/skills/`              |
+| Hermes           | `--agent hermes`   | `~/.hermes/skills/`            |
 
-Local installs mirror this structure under the project directory (e.g. `<project>/.codex/skills/kstack-*/`) and are picked up only when the agent is run from inside that directory.
+Local installs mirror this structure under the project directory (e.g. `<project>/.codex/skills/`) and are picked up only when the agent is run from inside that directory.
 
 ## Skills Reference
 

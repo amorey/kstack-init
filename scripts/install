@@ -32,8 +32,8 @@
 #   Global (--global) — for ambient use outside any project.
 #     Maintains a kstack-owned checkout at ~/.config/kstack/upstream/ at
 #     the latest released tag, then renders skills from there into
-#     ~/.<agent>/skills/kstack-<skill>/SKILL.md and copies helper binaries
-#     into ~/.config/kstack/bin/.
+#     ~/.<agent>/skills/<skill>/SKILL.md (prefixed if --prefix was passed)
+#     and copies helper binaries into ~/.config/kstack/bin/.
 #
 # --local and --global never use the invoker's checkout as the source; the
 # canonical upstream is always cloned/updated fresh, so running these from
@@ -49,6 +49,7 @@
 #   scripts/install --agent <name>   Limit to one agent.
 #   scripts/install --local          Local install into $PWD/.kstack.
 #   scripts/install --global         Global install for auto-detected agents.
+#   scripts/install --prefix <p>     Namespace skill slots as <p><skill> (default: no prefix).
 #   scripts/install -q | --quiet     Suppress log output.
 #
 # Contributors normally invoke dev mode via `make install`.
@@ -63,6 +64,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 
 # shellcheck source=../src/lib/agents.sh
 . "$REPO_ROOT/src/lib/agents.sh"
+# shellcheck source=../src/lib/manifest.sh
+. "$REPO_ROOT/src/lib/manifest.sh"
 
 KSTACK_CONFIG_DIR="$HOME/.config/kstack"
 # Override KSTACK_REMOTE_URL for CI and local-clone testing. Leave unset for
@@ -112,8 +115,8 @@ ensure_src_checkout() {
 
 # render_skill $skill $skill_name $agent $root_dir $skill_dir $out_file $skills_src $global_flags_partial $entrypoint_partial
 #   $skill      — source directory under $skills_src (template lookup)
-#   $skill_name — value substituted for {{SKILL_NAME}} (the user-visible slot name,
-#                 prefixed with "kstack-" in global mode)
+#   $skill_name — value substituted for {{SKILL_NAME}} (the user-visible
+#                 slot name: $PREFIX$skill, with $PREFIX empty by default)
 render_skill() {
   local skill="$1" skill_name="$2" agent="$3" root_dir="$4" skill_dir="$5" out_file="$6"
   local skills_src="$7" gf="$8" ep="$9"
@@ -202,10 +205,15 @@ prune_orphans() {
   done
 }
 
-# install_agent $agent $root_dir $skills_dir $slot_prefix
-#   $slot_prefix is "" for local, "kstack-" for global.
+# install_agent $agent $root_dir $skills_dir $slot_prefix $stale_slots
+#   $slot_prefix is user-supplied via --prefix (default ""). Slots render as
+#   $skills_dir/${slot_prefix}${skill}/.
+#   $stale_slots is a space-delimited list of slot names from the previous
+#   install that are no longer part of the current set (different prefix,
+#   skill renamed, skill removed from source). Each is removed from
+#   $skills_dir if present.
 install_agent() {
-  local agent="$1" root_dir="$2" skills_dir="$3" slot_prefix="$4"
+  local agent="$1" root_dir="$2" skills_dir="$3" slot_prefix="$4" stale_slots="$5"
   mkdir -p "$skills_dir"
 
   local slots="" skill slot out_dir out_file help_file
@@ -234,10 +242,13 @@ install_agent() {
   [ "$n" = 1 ] && plural=""
   log "   🤖 $agent   → $skills_dir  ($n skill$plural)"
 
-  # Prune stale slots from prior installs. Every mode uses a kstack- prefix,
-  # so the glob scopes pruning to kstack-* and user-authored skills in a
-  # shared skills dir are never touched.
-  prune_orphans "$skills_dir" "${slot_prefix}*" "${slots# }" ""
+  local stale
+  for stale in $stale_slots; do
+    [ -n "$stale" ] || continue
+    [ -e "${skills_dir}/${stale}" ] || continue
+    rm -rf "${skills_dir:?}/${stale:?}"
+    log "   🗑  pruned: $stale"
+  done
 }
 
 # sync_dir $src $glob $dst $label $executable
@@ -319,6 +330,7 @@ main() {
   AGENT=""
   GLOBAL=0
   LOCAL=0
+  PREFIX=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --agent)
@@ -327,6 +339,10 @@ main() {
       --agent=*) AGENT="${1#--agent=}"; shift ;;
       --global) GLOBAL=1; shift ;;
       --local) LOCAL=1; shift ;;
+      --prefix)
+        [ $# -lt 2 ] && { echo "Missing value for --prefix" >&2; exit 1; }
+        PREFIX="$2"; shift 2 ;;
+      --prefix=*) PREFIX="${1#--prefix=}"; shift ;;
       -q|--quiet) QUIET=1; shift ;;
       -h|--help)
         sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
@@ -334,6 +350,13 @@ main() {
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
+
+  # Reject prefixes that would produce unsafe slot names.
+  if [ -n "$PREFIX" ]; then
+    case "$PREFIX" in
+      .*|*[!A-Za-z0-9._-]*) echo "Invalid --prefix: $PREFIX" >&2; exit 1 ;;
+    esac
+  fi
 
   if [ "$GLOBAL" -eq 1 ] && [ "$LOCAL" -eq 1 ]; then
     echo "--global and --local are mutually exclusive" >&2
@@ -430,17 +453,29 @@ main() {
   # dev mode stamps it from the current git checkout.
   [ "$MODE" = dev ] && write_local_install_conf "$ROOT_DIR" "$REPO_ROOT"
 
-  # Every mode renders slots as kstack-<skill>. Uniform naming means pruning
-  # uses the same kstack-* glob everywhere, so user-authored skills in a
-  # shared agent dir are safe from cleanup on re-install.
+  # Slot names are uniform across agents ($PREFIX + skill), so the prev→new
+  # diff is computed once and each agent prunes the same stale set.
+  NEW_SLOTS=""
+  for s in $SKILL_NAMES; do NEW_SLOTS="$NEW_SLOTS ${PREFIX}${s}"; done
+  STALE_SLOTS=""
+  for p in $(manifest::read "$ROOT_DIR"); do
+    case " $NEW_SLOTS " in
+      *" $p "*) ;;
+      *) STALE_SLOTS="$STALE_SLOTS $p" ;;
+    esac
+  done
+
   for h in $TARGET_AGENTS; do
     case "$MODE" in
       global) skills_dir="$(agent_skills_dir_global "$h")" ;;
       local)  skills_dir="$(agent_skills_dir_local "$PWD" "$h")" ;;
       dev)    skills_dir="$(agent_skills_dir_local "$REPO_ROOT" "$h")" ;;
     esac
-    install_agent "$h" "$ROOT_DIR" "$skills_dir" "kstack-"
+    install_agent "$h" "$ROOT_DIR" "$skills_dir" "$PREFIX" "${STALE_SLOTS# }"
   done
+
+  # shellcheck disable=SC2086 # intentional word-splitting — each token is a slot.
+  manifest::write "$ROOT_DIR" $NEW_SLOTS
 
   log ""
   log "✅ kstack installed. Start a session with your agent to use the skills."
