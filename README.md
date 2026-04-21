@@ -47,10 +47,9 @@ To install kstack globally so you can use the skills from inside any project run
 curl -sS https://kubestack.xyz/install.sh | bash
 ```
 
-Alternatively, you can install kstack locally so the skills are only available from inside one project directory:
+Alternatively, you can install kstack locally so the skills are only available inside your current directory:
 
 ```console
-mkdir myproject && cd myproject
 curl -sS https://kubestack.xyz/install.sh | bash -s -- --local
 ```
 
