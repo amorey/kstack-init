@@ -57,7 +57,7 @@ The bootstrap script installs the kstack skills into your global/local Claude sk
 
 ```console
 ───────────────────────────────────
-> /cluster-status
+❯ /cluster-status
 ───────────────────────────────────
 ```
 
